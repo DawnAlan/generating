@@ -1,5 +1,7 @@
 package com.hust.generatingcapacity.tools;
 
+import com.opencsv.CSVReader;
+import com.opencsv.exceptions.CsvValidationException;
 import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.formula.eval.NotImplementedException;
 import org.apache.poi.ss.usermodel.*;
@@ -7,6 +9,9 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.*;
+import java.nio.charset.Charset;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class ExcelUtils {
@@ -39,6 +44,31 @@ public class ExcelUtils {
         }
     }
 
+    // 读取 .csv 文件
+    public static Object[][] readCsv(String filePath) {
+        List<List<String>> records = new ArrayList<>();
+        try (
+                InputStreamReader isr = new InputStreamReader(new FileInputStream(filePath), Charset.forName("GBK"));
+                CSVReader reader = new CSVReader(isr)
+        ) {
+            String[] line;
+            while ((line = reader.readNext()) != null) {
+                records.add(Arrays.asList(line));
+            }
+
+            int rows = records.size();
+            int cols = records.get(0).size();
+            Object[][] data = new Object[rows][cols];
+            for (int i = 0; i < rows; i++) {
+                data[i] = records.get(i).toArray();
+            }
+            return data;
+
+        } catch (IOException | CsvValidationException e) {
+            throw new RuntimeException("读取CSV文件失败：" + filePath, e);
+        }
+    }
+
     private static Object[][] readSheet(Sheet sheet, int maxRow, int maxCol) {
         // 创建二维Object数组
         Object[][] data = new Object[maxRow][maxCol];
@@ -65,7 +95,13 @@ public class ExcelUtils {
                 // 读取单元格的值
                 switch (cell.getCellType()) {
                     case STRING:
-                        data[rowIndex][colIndex] = cell.getStringCellValue();
+                        String cellValueStr = cell.getStringCellValue();
+                        Date parsedDate = tryParseDate(cellValueStr);
+                        if (parsedDate != null) {
+                            data[rowIndex][colIndex] = parsedDate;
+                        } else {
+                            data[rowIndex][colIndex] = cellValueStr;
+                        }
                         break;
                     case NUMERIC:
                         if (DateUtil.isCellDateFormatted(cell)) {
@@ -120,6 +156,39 @@ public class ExcelUtils {
         return data;
     }
 
+    public static Date tryParseDate(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return null;
+        }
+
+        String[] patterns = {
+                "yyyy-MM-dd HH:mm:ss",
+                "yyyy-MM-dd HH:mm",
+                "yyyy-MM-dd HH",
+                "yyyy/MM/dd HH:mm:ss",
+                "yyyy/MM/dd HH:mm",
+                "yyyy/MM/dd HH",
+                "yyyy-MM-dd",
+                "yyyy/MM/dd",
+                "yyyyMMdd",
+                "yyyy年MM月dd日",
+                "yyyy-MM-dd'T'HH:mm:ss",
+                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+        };
+
+        for (String pattern : patterns) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat(pattern);
+                sdf.setLenient(false); // 严格模式
+                return sdf.parse(dateStr);
+            } catch (ParseException ignored) {
+            }
+        }
+
+        return null; // 无法解析为日期
+    }
+
+
     public static Map<String, Object[][]> readExcel(Workbook workbook) {
         int numberOfSheets = workbook.getNumberOfSheets();
         Map<String, Object[][]> result = new TreeMap<>();
@@ -146,7 +215,7 @@ public class ExcelUtils {
      * @param column
      * @return
      */
-    public static Object[][] readPartExcel(String fileName, String sheetName, int raw, int column){
+    public static Object[][] readPartExcel(String fileName, String sheetName, int raw, int column) {
         ZipSecureFile.setMinInflateRatio(-1.0d);
         try (InputStream is = getInputStreamSmart(fileName)) {
             Workbook workbook;

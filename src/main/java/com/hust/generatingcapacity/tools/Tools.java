@@ -6,25 +6,40 @@ public class Tools {
 
     /**
      * 检查object是什么类型
+     *
      * @param obj
      * @return
      */
-    public static Integer checkObjectType(Object obj){
+    public static Integer checkObjectType(Object obj) {
         int type = 0;
         if (obj instanceof String) {
             type = 1;
         } else if (obj instanceof Number) {
             type = 2;
-        }else if (obj instanceof Boolean) {
+        } else if (obj instanceof Boolean) {
             type = 3;
-        }else if (obj instanceof java.util.Date) {
+        } else if (obj instanceof java.util.Date) {
             type = 4;
         }
         return type;
     }
 
     /**
+     * 将数字转换为double
+     * @param obj
+     * @return
+     */
+    public static double changeObjToDouble(Object obj) {
+        if (obj instanceof Number){
+            return Double.parseDouble(obj.toString());
+        }else {
+            return 0.0;
+        }
+    }
+
+    /**
      * 检查是否数组越界的方法
+     *
      * @param array
      * @param row
      * @param column
@@ -51,37 +66,38 @@ public class Tools {
 
     /**
      * 把两个Object相加，除了两者都是数字时相加，其他时候都是转成字符串相加
+     *
      * @param a
      * @param b
      * @return
      */
-    public static Object addObject(Object a ,Object b){
+    public static Object addObject(Object a, Object b) {
         Object r = new Object();
-        if (a==null){
+        if (a == null) {
             a = 0;
         }
-        if (b==null){
+        if (b == null) {
             b = 0;
         }
         if (a instanceof Number && b instanceof Number) {
             if (a instanceof Integer && b instanceof Double) {
                 int aValue = (Integer) a;
                 double bValue = ((Double) b);
-                r = aValue+bValue;
+                r = aValue + bValue;
             } else if (a instanceof Integer && b instanceof Integer) {
                 int aValue = (Integer) a;
                 int bValue = ((Integer) b);
-                r = aValue+bValue;
-            }else if (a instanceof Double && b instanceof Integer) {
+                r = aValue + bValue;
+            } else if (a instanceof Double && b instanceof Integer) {
                 double aValue = (Double) a;
                 int bValue = ((Integer) b);
-                r = aValue+bValue;
+                r = aValue + bValue;
             } else if (a instanceof Double && b instanceof Double) {
                 double aValue = (Double) a;
                 double bValue = ((Double) b);
-                r = aValue+bValue;
+                r = aValue + bValue;
             }
-        }else {
+        } else {
             r = a + b.toString();
         }
         return r;
@@ -103,10 +119,11 @@ public class Tools {
 
     /**
      * 将List<List<Double>> 转换为Object，一维List代表某一列的所有行，二维List代表有几列
+     *
      * @param data
      * @return
      */
-    public static Object[][] listTwoToObject(List<List<Double>>data){
+    public static Object[][] listTwoToObject(List<List<Double>> data) {
         int l = 0;
         for (List<Double> datum : data) {
             if (datum.size() > l) {

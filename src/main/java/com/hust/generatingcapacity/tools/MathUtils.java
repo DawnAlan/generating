@@ -1,10 +1,6 @@
 package com.hust.generatingcapacity.tools;
 
 
-
-import java.util.DoubleSummaryStatistics;
-import java.util.List;
-
 /**
  * 通用数学方法
  *
@@ -294,6 +290,58 @@ public class MathUtils {
             for (int i = 0; i < real[0].length; i++) {
                 qualifyNum[j] = 0;
                 if (Math.abs(estimate[j][i] - real[j][i]) / real[j][i] <= 0.2) {
+                    qualifyNum[j]++;
+                }
+            }
+        }
+        double sum = 0;
+        for (int i = 0; i < qr.length; i++) {
+            qr[i] = (double) qualifyNum[i] / size;
+            sum += qr[i];
+        }
+
+        double avgResult = 0;
+        for (int i = 0; i < real.length; i++) {
+            avgResult += qr[i] / real[0].length;
+        }
+        return avgResult;
+    }
+
+    // 计算合格率
+    public static double QualifyRateLarge(double[][] real, double[][] estimate) {
+        int size = real.length;
+        int[] qualifyNum = new int[real.length];
+        double[] qr = new double[real.length];
+        for (int j = 0; j < real.length; j++) {
+            for (int i = 0; i < real[0].length; i++) {
+                qualifyNum[j] = 0;
+                if (estimate[j][i] > real[j][i]) {
+                    qualifyNum[j]++;
+                }
+            }
+        }
+        double sum = 0;
+        for (int i = 0; i < qr.length; i++) {
+            qr[i] = (double) qualifyNum[i] / size;
+            sum += qr[i];
+        }
+
+        double avgResult = 0;
+        for (int i = 0; i < real.length; i++) {
+            avgResult += qr[i] / real[0].length;
+        }
+        return avgResult;
+    }
+
+    // 计算合格率
+    public static double QualifyRateTen(double[][] real, double[][] estimate) {
+        int size = real.length;
+        int[] qualifyNum = new int[real.length];
+        double[] qr = new double[real.length];
+        for (int j = 0; j < real.length; j++) {
+            for (int i = 0; i < real[0].length; i++) {
+                qualifyNum[j] = 0;
+                if (Math.abs(estimate[j][i] - real[j][i]) / real[j][i] <= 0.1) {
                     qualifyNum[j]++;
                 }
             }
