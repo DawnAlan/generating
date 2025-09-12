@@ -1,6 +1,6 @@
-package com.hust.generatingcapacity.pre_processing;
+package pre_processing;
 
-import com.hust.generatingcapacity.entity.TimeRange;
+import com.hust.generatingcapacity.model.entity.TimeRange;
 import com.hust.generatingcapacity.tools.ExcelUtils;
 import com.hust.generatingcapacity.tools.PreProcessUtils;
 

@@ -1,6 +1,6 @@
 package com.hust.generatingcapacity.tools;
 
-import com.hust.generatingcapacity.entity.TimeRange;
+import com.hust.generatingcapacity.model.entity.TimeRange;
 
 import java.util.*;
 
@@ -18,7 +18,7 @@ public class PreProcessUtils {
      * @return 筛选后的数据，二维数组，第一行是表头
      */
     @SafeVarargs
-    public static <T> Object[][] splitData(Object[][] data, Map<String, Integer> splitsPositions, TimeRange timeRange, Map<T, String> splitMessages, T ... splits) {
+    public static <T> Object[][] splitData(Object[][] data, Map<String, Integer> splitsPositions, TimeRange timeRange, Map<T, String> splitMessages, T... splits) {
         List<Object[]> splitData = new ArrayList<>();
         //获取到时间和其它筛选条件所在的列索引
         Integer timeIndex = -10086;
@@ -45,7 +45,7 @@ public class PreProcessUtils {
         splitData.add(head);
         for (int i = 1; i < data.length; i++) {
             boolean match = true;
-            if (timeIndex != -10086 && timeRange != null && !timeRange.isEmpty()) {
+            if (timeIndex != -10086 && timeRange != null && !timeRange.isEmpty() && Tools.checkObjectType(data[i][timeIndex]) == 4) {
                 match = TimeRange.isInRange((Date) data[i][timeIndex], timeRange);
             }
             for (int j = 0; j < splitList.size(); j++) {

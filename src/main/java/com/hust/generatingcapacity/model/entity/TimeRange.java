@@ -1,4 +1,4 @@
-package com.hust.generatingcapacity.entity;
+package com.hust.generatingcapacity.model.entity;
 
 
 import com.fasterxml.jackson.annotation.JsonFormat;

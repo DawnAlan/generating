@@ -1,4 +1,4 @@
-package com.hust.generatingcapacity.entity;
+package com.hust.generatingcapacity.model.entity;
 
 import lombok.Data;
 import lombok.Getter;
@@ -70,4 +70,26 @@ public class CodeValue {
     public static double getMaxValue(List<CodeValue> values){
         return Collections.max(values, Comparator.comparing(CodeValue::getValue)).getValue();
     }
+
+    public static String listToStringWithLimit(List<?> list, int limit) {
+        if (list == null || list.isEmpty()) {
+            return "[]";
+        }
+
+        int size = list.size();
+        StringBuilder sb = new StringBuilder("[\n");
+
+        int showCount = Math.min(limit, size);
+        for (int i = 0; i < showCount; i++) {
+            sb.append("    ").append(list.get(i)).append("\n"); // 缩进4个空格
+        }
+
+        if (size > limit) {
+            sb.append("    ...还有 ").append(size - limit).append(" 条数据未显示\n");
+        }
+
+        sb.append("]");
+        return sb.toString();
+    }
+
 }

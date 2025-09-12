@@ -1,0 +1,114 @@
+spring:
+  application:
+    name: GeneratingCapacity
+
+  profiles:
+    active: test  # 当前激活的配置环境，可切换为 prod
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: test
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 100MB
+  datasource:
+    url: jdbc:mysql://localhost:3306/ddh_powerforecast?serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+    # MySQL 数据源的 Hibernate 配置
+    hibernate:
+      ddl-auto: update
+
+  jackson:
+    mapper:
+      accept-case-insensitive-properties: true
+    time-zone: Asia/Shanghai
+
+
+
+server:
+  port: 8088
+  address: 0.0.0.0
+
+logging:
+  level:
+    org.hibernate.SQL: off
+    org.hibernate.type.descriptor.sql.BasicBinder: off
+
+# 定时任务配置
+timing:
+  task:
+    auto-scheme-cron: "0 0 8 * * ?"
+    daily-nine-am-cron: "0 0 9 * * ?"
+    daily-eight-am-cron: "0 0 8 * * ?"
+    hourly-cron: "0 0 * * * ?"  # 每小时整点执行任务
+
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 100MB
+  datasource:
+    main:
+      jdbc-url: jdbc:mysql://localhost:3306/leakage?serverTimeZone=Asia/Phnom_Penh
+      username: root
+      password: 123456
+      driver-class-name: com.mysql.cj.jdbc.Driver
+    dam:
+      jdbc-url: jdbc:sqlserver://10.228.16.39:1433;databaseName=damsafety_sfy;encrypt=TRUE;trustServerCertificate=true
+      username: sa
+      password: sac@1234
+      driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    rain:
+      jdbc-url: jdbc:sqlserver://10.228.16.200:1433;databaseName=wds;encrypt=TRUE;trustServerCertificate=true
+      username: wds
+      password: narisq
+      driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: Asia/Phnom_Penh
+    hibernate:
+      ddl-auto: update
+  jackson:
+    mapper:
+      accept-case-insensitive-properties: true
+    time-zone: Asia/Phnom_Penh
+
+server:
+  port: 8069
+  address: 0.0.0.0
+
+logging:
+  level:
+    org.hibernate.SQL: off
+    org.hibernate.type.descriptor.sql.BasicBinder: off
+
+# 定时任务配置
+timing:
+  task:
+    auto-scheme-cron: "0 0 8 * * ?"
+    daily-nine-am-cron: "0 0 9 * * ?"
+    daily-eight-am-cron: "0 0 8 * * ?"
+    hourly-cron: "0 0 * * * ?"  # 每小时整点执行任务

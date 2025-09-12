@@ -1,10 +1,10 @@
 package com.hust.generatingcapacity.model.generation;
 
 
-import com.hust.generatingcapacity.entity.CalculateData;
-import com.hust.generatingcapacity.entity.CodeValue;
-import com.hust.generatingcapacity.entity.HNQData;
-import com.hust.generatingcapacity.entity.NHQCell;
+import com.hust.generatingcapacity.model.entity.CalculateData;
+import com.hust.generatingcapacity.model.entity.CodeValue;
+import com.hust.generatingcapacity.model.entity.NHQData;
+import com.hust.generatingcapacity.model.entity.NHQCell;
 import com.hust.generatingcapacity.tools.ExcelUtils;
 
 import java.util.ArrayList;
@@ -14,7 +14,7 @@ import java.util.List;
 import static com.hust.generatingcapacity.tools.Tools.changeObjToDouble;
 
 public class WaterConsumptionRateCalculator {
-    public static List<HNQData> hnqList = new ArrayList<>();
+    public static List<NHQData> hnqList = new ArrayList<>();
 
     public static void main(String[] args) {
         //获取水位库容曲线
@@ -46,7 +46,7 @@ public class WaterConsumptionRateCalculator {
             }
         }
         //可以获取到插值的出力
-        hnqList = NHQCell.convert("N", NHQDataList);
+        hnqList = NHQCell.convert(NHQDataList);
         //获取径流、水位、水头数据
         Object[][] historyData = ExcelUtils.readExcel("C:\\Users\\12566\\Desktop\\大渡河数据\\整合资料\\猴子岩24年汛期数据.xlsx", "历史真实值");
         //分为以下几种情况：1.根据NHQ计算，由历史真实径流和水位变化计算出库，然后计算出力，计算发电能力（计算值和真实值对比）
@@ -110,7 +110,7 @@ public class WaterConsumptionRateCalculator {
      * @param hnqList      此时Value为 N
      * @return
      */
-    public static void calculateByNHQ(CalculateData calData, List<CodeValue> levelCapList, List<HNQData> hnqList) {
+    public static void calculateByNHQ(CalculateData calData, List<CodeValue> levelCapList, List<NHQData> hnqList) {
         //库容变化量
         double capChange = Math.pow(10, 6) * (CodeValue.linearInterpolation(calData.getLevelAft(), levelCapList) - CodeValue.linearInterpolation(calData.getLevelBef(), levelCapList));
         //来水量
@@ -123,14 +123,14 @@ public class WaterConsumptionRateCalculator {
         //日均出库流量
         double outFlow = outQ / 24 / 3600;
         //获取该水头下的单个机组最大发电流量
-        double maxOneCalFlow = HNQData.getMaxCode(calData.getHead(), hnqList);
+        double maxOneCalFlow = NHQData.getMaxN(calData.getHead(), hnqList);
         //获取满发机组数量和各机组负荷
         int maxUnits = Math.min(calData.getUnits(), (int) (outFlow / maxOneCalFlow));
         //计算机组总负荷
-        double allN = maxUnits * HNQData.lineInterpolation(calData.getHead(), maxOneCalFlow, hnqList);
+        double allN = maxUnits * NHQData.lineInterpolation(calData.getHead(), maxOneCalFlow, "N", hnqList);
         if (maxUnits < calData.getUnits()) {//存在机组未满发
             double oneCalFlow = outFlow - maxOneCalFlow * maxUnits;
-            double oneCalN = HNQData.lineInterpolation(calData.getHead(), oneCalFlow, hnqList);
+            double oneCalN = NHQData.lineInterpolation(calData.getHead(), oneCalFlow, "N", hnqList);
             allN += oneCalN;
         }
         calData.setCalGen(allN * 24);
@@ -157,7 +157,7 @@ public class WaterConsumptionRateCalculator {
         //日均出库流量
         double outFlow = outQ / 24 / 3600;
         //获取该水头下的单个机组最大发电流量
-        double maxOneCalFlow = HNQData.getMaxCode(calData.getHead(), hnqList);
+        double maxOneCalFlow = NHQData.getMaxN(calData.getHead(), hnqList);
         //获取最大发电流量
         double maxCalFlow = Math.min(maxOneCalFlow * calData.getUnits(), outFlow);
 //        double maxCalFlow = outFlow;
