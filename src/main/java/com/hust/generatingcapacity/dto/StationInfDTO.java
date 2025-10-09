@@ -1,6 +1,5 @@
 package com.hust.generatingcapacity.dto;
 
-import com.hust.generatingcapacity.model.generation.domain.CodeValue;
 import com.hust.generatingcapacity.tools.StreamUtils;
 import lombok.Data;
 import lombok.Getter;
@@ -46,6 +45,8 @@ public class StationInfDTO {
     private Boolean isParticipateMarket;
     //水库信息包含水位库容曲线
     private ReservoirInfDTO reservoirInf;
+    //是否为水位耗水率（否——水头耗水率曲线）
+    private Boolean isWaterConsumption;
     //水位耗水率曲线
     private List<CodeValueDTO> waterConsumptionLine;
     //尾水位流量曲线(流量为code，水位为value)

@@ -1,9 +1,12 @@
 package pre_processing;
 
+import com.hust.generatingcapacity.model.common.TimeRange;
 import com.hust.generatingcapacity.tools.ExcelUtils;
+import com.hust.generatingcapacity.tools.PreProcessUtils;
 import com.hust.generatingcapacity.tools.TimeUtils;
 import lombok.SneakyThrows;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -12,7 +15,7 @@ public class PreFlow {
      * 提取20枯水期预报径流数据
      */
 //    public static void main(String[] args) throws ParseException {
-//        String fileName = "D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\径流资料\\预报资料\\概率预报-日.xlsx";
+//        String fileName = "D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\径流资料\\预报资料\\相似性预报-日.xlsx";
 //        Object[][] data1 = ExcelUtils.readExcel(fileName, "Sheet1");
 //        Object[][] data2 = ExcelUtils.readExcel(fileName, "Sheet2");
 //        Map<String, Integer> splitsPositions = Map.of("split1", 0, "time", 1);
@@ -23,17 +26,25 @@ public class PreFlow {
 //            }
 //        }
 //        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH");
-//        TimeRange timeRange = new TimeRange(sdf.parse("2024-11-01 00"), sdf.parse("2025-04-30 23"));
+//        TimeRange timeRange = new TimeRange(sdf.parse("2024-04-01 00"), sdf.parse("2025-07-01 23"));
 //        List<Integer> splits = new ArrayList<>();
-//        splits.add(15000016);
-//        splits.add(15000007);
-//        splits.add(15000002);
-//        splits.add(15000001);
-////        splits.add(30000005);
-////        splits.add(30000025);
-////        splits.add(30000027);
-////        splits.add(30000028);
-//        String fileName2 = "D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\径流资料\\预报资料\\24年枯期预报数据\\大渡河24年枯期概率预报-日.xlsx";
+////        splits.add(15000016);
+////        splits.add(15000007);
+////        splits.add(15000002);
+////        splits.add(15000001);
+//
+//        splits.add(30000005);
+//        splits.add(30000025);
+//        splits.add(30000027);
+//        splits.add(30000028);
+//        splits.add(30000008);
+//        splits.add(30000017);
+//        splits.add(30000020);
+//        splits.add(30000031);
+//        splits.add(30000078);
+//        splits.add(31000036);
+//        splits.add(31000049);
+//        String fileName2 = "D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\径流资料\\预报资料\\大渡河24~25年相似性预报-日.xlsx";
 //        for (Integer split : splits) {
 //            Object[][] result = PreProcessUtils.splitData(data1, splitsPositions, timeRange, splitMessages, split);
 //            ExcelUtils.writeExcel(fileName2, splitMessages.get(split), result);
@@ -49,12 +60,12 @@ public class PreFlow {
     @SneakyThrows
     public static void main(String[] args) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-        String fileName = "D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\径流资料\\预报资料\\20年枯期预报数据\\大渡河20年枯期概率预报-日.xlsx";
-        String resultName = "D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\径流资料\\预报资料\\20年枯期预报数据\\大渡河20年枯期不同预见期概率预报-日.xlsx";
+        String fileName = "D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\径流资料\\预报资料\\大渡河24~25年相似性预报-日.xlsx";
+        String resultName = "D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\径流资料\\预报资料\\大渡河24~25年相似性不同预见期预报-日.xlsx";
         List<String> sheets = ExcelUtils.checkSheetsInExcel(fileName);
-        Integer[] preDays = new Integer[]{1, 3, 10};
-        Date start = sdf.parse("2020-10-31");
-        Date end = sdf.parse("2021-04-30");
+        Integer[] preDays = new Integer[]{1, 3, 7};
+        Date start = sdf.parse("2024-03-31");
+        Date end = sdf.parse("2025-07-01");
 
 //        Object[] head = new Object[5];
 //        head[0] = "电站";
@@ -73,7 +84,7 @@ public class PreFlow {
                 boolean matched = false;
                 int dateIndex = 1;
                 for (int k = 1; k < data.length; k++) {
-                    Date dateP = (Date) data[k][1];//相似性与概率需要修改
+                    Date dateP = (Date) data[k][2];//相似性与概率需要修改
                     Date date = TimeUtils.addCalendar(start, "日", dateIndex);
                     if (matched && TimeUtils.dateCompare(date, dateP, "日")) {
                         continue;
@@ -92,8 +103,8 @@ public class PreFlow {
                     }
                     if (TimeUtils.dateCompare(date, dateP, "日")) {
                         for (int l = 0; l < preDays[j]; l++) {
-                            time.add(data[k + l][2]);//相似性与概率需要修改
-                            row.add(data[k + l][3]);//相似性与概率需要修改
+                            time.add(data[k + l][3]);//相似性与概率需要修改
+                            row.add(data[k + l][4]);//相似性与概率需要修改
                         }
                         dateIndex += preDays[j];
                         matched = true;
@@ -106,12 +117,12 @@ public class PreFlow {
             resultObject[0][0] = "日期";
             resultObject[0][1] = "预见期1天";
             resultObject[0][2] = "预见期3天";
-            resultObject[0][3] = "预见期10天";
+            resultObject[0][3] = "预见期7天";
             for (int j = 0; j < result.get("预见期1天").size(); j++) {
                 resultObject[j + 1][0] = result.get("日期").get(j);
                 resultObject[j + 1][1] = result.get("预见期1天").get(j);
                 resultObject[j + 1][2] = result.get("预见期3天").get(j);
-                resultObject[j + 1][3] = result.get("预见期10天").get(j);
+                resultObject[j + 1][3] = result.get("预见期7天").get(j);
             }
             ExcelUtils.writeExcel(resultName, sheets.get(i), resultObject);
         }

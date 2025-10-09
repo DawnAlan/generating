@@ -67,7 +67,7 @@ public class RuleBasedDispatch {
     private static CalculateStep calculateMinRevision(CalculateStep data, CalculateParam calParam, ParamValue paramValue, StationData stationData) {
         double rate;
         if (calParam.isConsiderH()) {
-            rate = CodeValue.linearInterpolation(data.getLevelBef(), stationData.getWaterConsumptionLine());
+            rate = CodeValue.linearInterpolation(stationData.getIsWaterConsumption() ? data.getLevelBef() : data.getHead(), stationData.getWaterConsumptionLine());
         } else {
             rate = stationData.getWaterConsumptionLine().get(0).getValue();
         }
@@ -140,7 +140,7 @@ public class RuleBasedDispatch {
                     .sum();
             data.setQp(qpMax);
             data.setQo(qpMax);
-            double rate = CodeValue.linearInterpolation(data.getLevelBef(), stationData.getWaterConsumptionLine());
+            double rate = CodeValue.linearInterpolation(stationData.getIsWaterConsumption() ? data.getLevelBef() : data.getHead(), stationData.getWaterConsumptionLine());
             double gen = qpMax * calParam.getPeriod() / rate / 1e3;
             data.setCalGen(gen);
             double levelAft = calculateLevelAft(data.getLevelBef(), qpMax, data.getInFlow(), calParam, stationData);
@@ -174,7 +174,7 @@ public class RuleBasedDispatch {
             double qpMax = stationData.getNHQLines().stream()
                     .mapToDouble(line -> NHQData.getMaxQ(data.getHead(), line))
                     .sum();
-            double rate = CodeValue.linearInterpolation(data.getLevelBef(), stationData.getWaterConsumptionLine());
+            double rate = CodeValue.linearInterpolation(stationData.getIsWaterConsumption() ? data.getLevelBef() : data.getHead(), stationData.getWaterConsumptionLine());
             ParamType type = paramValue.getParamType();
             double value = paramValue.getParamValue();
             switch (type) {

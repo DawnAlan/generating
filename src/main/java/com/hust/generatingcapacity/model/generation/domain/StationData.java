@@ -47,6 +47,8 @@ public class StationData {
     private List<CodeValue> reservoirStorageLine;
     //  水位耗水率曲线
     private List<CodeValue> waterConsumptionLine;
+    //  是否为水位耗水率
+    private Boolean isWaterConsumption;
     //  尾水位流量曲线(流量为code，水位为value)
     private List<CodeValue> tailLevelFlowLine;
     //  NHQ曲线

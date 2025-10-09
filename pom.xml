@@ -96,7 +96,13 @@
             <artifactId>aviator</artifactId>
             <version>5.4.3</version>
         </dependency>
-<!--        Mapper转换-->
+        <!-- 线性规划计算插件-->
+        <dependency>
+            <groupId>org.ojalgo</groupId>
+            <artifactId>ojalgo</artifactId>
+            <version>55.0.0</version>
+        </dependency>
+        <!--        Mapper转换-->
         <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
@@ -109,9 +115,6 @@
             <version>1.5.5.Final</version>
             <scope>provided</scope>
         </dependency>
-
-
-
     </dependencies>
 
     <build>

@@ -76,7 +76,7 @@ public class CalculateTest {
                 "龙头石", "瀑布沟", "深溪沟", "枕头坝一级", "沙坪二级",
                 "龚嘴", "铜街子", "沙湾", "安谷");
 //        List<String> stations = List.of( "安谷");
-        int L = 7;
+        int L = 1;
         String period = "日";
         Date start = sdf.parse("2020-11-01");
 //        Date end = sdf.parse("2020-11-03");

@@ -41,6 +41,7 @@ public class ConstraintData {
         if (env == null || env.isEmpty()) {
             throw new IllegalArgumentException("请检查 " + description + " 判断条件是否生效的输入！");
         }
+//        System.out.println(condition);
         return (Boolean) AviatorEvaluator.execute(condition, env);
     }
 

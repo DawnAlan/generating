@@ -13,4 +13,9 @@ public interface WaterLevelConsumptionRepository extends JpaRepository<WaterLeve
             "FROM WaterLevelConsumption w " +
             "WHERE w.hydropowerStation.stationName = :station_name")
     List<CodeValueDTO> findAllByStationName(@Param("station_name") String station_name);
+
+    @Query("SELECT w.isWaterLevel FROM WaterLevelConsumption w " +
+            "WHERE w.hydropowerStation.stationName = :station_name")
+    Boolean findFirstIsWaterLevelByStationName(@Param("station_name") String stationName);
+
 }

@@ -41,9 +41,12 @@ public class HydropowerStationService implements IHydropowerStationService {
         List<ConstraintInfDTO> constraintInfs = dispatchConstraintService.get(stationName);
         //获取水位耗水率曲线
         List<CodeValueDTO> waterConsumptionLine = waterLevelConsumptionService.get(stationName);
+        //获取是否为水位耗水率
+        Boolean isWaterConsumption = waterLevelConsumptionService.getIsWaterConsumptionLine(stationName);
         //获取流量尾水位曲线
         List<CodeValueDTO> tailLevelFlowLine = tailWaterLevelFlowService.get(stationName);
         result.setWaterConsumptionLine(waterConsumptionLine);
+        result.setIsWaterConsumption(isWaterConsumption);
         result.setTailLevelFlowLine(tailLevelFlowLine);
         result.setReservoirInf(reservoirInfDTO);
         result.setUnitInfs(unitInfs);
@@ -60,6 +63,7 @@ public class HydropowerStationService implements IHydropowerStationService {
         if (stationInfDTO.getWaterConsumptionLine() != null) {
             stationData.setWaterConsumptionLine(dtoMapper.toCodeValueList(stationInfDTO.getWaterConsumptionLine()));
         }
+        stationData.setIsWaterConsumption(stationInfDTO.getIsWaterConsumption());
         if (stationInfDTO.getTailLevelFlowLine() != null) {
             stationData.setTailLevelFlowLine(dtoMapper.toCodeValueList(stationInfDTO.getTailLevelFlowLine()));
         }

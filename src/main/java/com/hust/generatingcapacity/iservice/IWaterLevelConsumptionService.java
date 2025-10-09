@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface IWaterLevelConsumptionService {
     List<CodeValueDTO> get(String station_name);
+    Boolean getIsWaterConsumptionLine(String station_name);
 }

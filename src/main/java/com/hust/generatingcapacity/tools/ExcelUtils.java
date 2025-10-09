@@ -349,7 +349,8 @@ public class ExcelUtils {
         } else {
             sheet = workbook.createSheet(sheetName);
         }
-
+        //写在循环外避免内存爆炸
+        CellStyle cellStyle = workbook.createCellStyle();
         // 填充数据到工作表中
         for (int rowIndex = 0; rowIndex < data.length; rowIndex++) {
             Row row = sheet.createRow(rowIndex); // 创建行
@@ -367,7 +368,6 @@ public class ExcelUtils {
                 } else if (data[rowIndex][colIndex] instanceof Date) {
                     // 写入日期时需要使用日期格式
                     cell.setCellValue((Date) data[rowIndex][colIndex]);
-                    CellStyle cellStyle = workbook.createCellStyle();
                     CreationHelper createHelper = workbook.getCreationHelper();
                     cellStyle.setDataFormat(createHelper.createDataFormat().getFormat("yyyy-MM-dd HH"));
                     cell.setCellStyle(cellStyle);

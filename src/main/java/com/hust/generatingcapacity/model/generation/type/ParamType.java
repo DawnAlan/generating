@@ -4,12 +4,7 @@ import lombok.Getter;
 
 @Getter
 public enum ParamType {
-    P(1),
-    H(3),
-    dH(4),
-    Qp(5),
-    Qo(1),
-    C(6);
+    P(1), H(3), dH(4), Qp(5), Qo(1), C(6);
 
     // 获取优先级
     private final int priority;
