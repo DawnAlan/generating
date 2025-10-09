@@ -1,4 +1,4 @@
-package com.hust.generatingcapacity.model.entity;
+package com.hust.generatingcapacity.model.generation.domain;
 
 import lombok.Data;
 import lombok.Getter;

@@ -1,9 +1,10 @@
-package com.hust.generatingcapacity.model.entity;
+package com.hust.generatingcapacity.model.generation.domain;
 
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -22,6 +23,13 @@ public class CodeValue {
     }
 
     public CodeValue() {
+    }
+
+    public static List<CodeValue> exchangeCopy(List<CodeValue> original) {
+        List<CodeValue> result = new ArrayList<>(original.stream()
+                .map(cv -> new CodeValue(cv.getValue(), cv.getCode()))
+                .toList());  // 先获取不可变的列表，再转换为可变列表
+        return result;
     }
 
     public static double linearInterpolation(double targetCode, List<CodeValue> values) {
@@ -64,32 +72,12 @@ public class CodeValue {
         }
     }
 
-    public static double getMaxCode(List<CodeValue> values){
+    public static double getMaxCode(List<CodeValue> values) {
         return Collections.max(values, Comparator.comparing(CodeValue::getCode)).getCode();
     }
-    public static double getMaxValue(List<CodeValue> values){
+
+    public static double getMaxValue(List<CodeValue> values) {
         return Collections.max(values, Comparator.comparing(CodeValue::getValue)).getValue();
-    }
-
-    public static String listToStringWithLimit(List<?> list, int limit) {
-        if (list == null || list.isEmpty()) {
-            return "[]";
-        }
-
-        int size = list.size();
-        StringBuilder sb = new StringBuilder("[\n");
-
-        int showCount = Math.min(limit, size);
-        for (int i = 0; i < showCount; i++) {
-            sb.append("    ").append(list.get(i)).append("\n"); // 缩进4个空格
-        }
-
-        if (size > limit) {
-            sb.append("    ...还有 ").append(size - limit).append(" 条数据未显示\n");
-        }
-
-        sb.append("]");
-        return sb.toString();
     }
 
 }

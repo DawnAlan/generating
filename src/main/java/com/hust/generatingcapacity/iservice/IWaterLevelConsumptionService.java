@@ -1,9 +1,10 @@
 package com.hust.generatingcapacity.iservice;
 
-import com.hust.generatingcapacity.model.entity.CodeValue;
+import com.hust.generatingcapacity.dto.CodeValueDTO;
+import com.hust.generatingcapacity.model.generation.domain.CodeValue;
 
 import java.util.List;
 
 public interface IWaterLevelConsumptionService {
-    List<CodeValue> get(String station_name);
+    List<CodeValueDTO> get(String station_name);
 }

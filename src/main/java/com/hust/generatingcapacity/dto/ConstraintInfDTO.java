@@ -4,6 +4,8 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Data
 @Getter
 @Setter
@@ -12,17 +14,20 @@ public class ConstraintInfDTO {
     private Integer id;
     //约束类型
     private String constraintType;
+    //硬性约束
+    private Boolean isRigid;
     //约束描述
     private String description;
     //生效条件
     private String condition;
     //约束参数
-    private String param;
+    private List<String> param;
 
-    public ConstraintInfDTO(Integer id, String constraintType, String description) {
+    public ConstraintInfDTO(Integer id, String constraintType, String description, Boolean isRigid) {
         this.id = id;
         this.constraintType = constraintType;
         this.description = description;
+        this.isRigid = isRigid;
     }
 
     public ConstraintInfDTO() {

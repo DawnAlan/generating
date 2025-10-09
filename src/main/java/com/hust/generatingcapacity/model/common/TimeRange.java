@@ -1,4 +1,4 @@
-package com.hust.generatingcapacity.model.entity;
+package com.hust.generatingcapacity.model.common;
 
 
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -13,9 +13,9 @@ import java.util.Date;
 @Setter
 public class TimeRange {
 
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Phnom_Penh")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Shanghai")
     private Date start;
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Phnom_Penh")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Shanghai")
     private Date end;
 
     public TimeRange(Date start, Date end) {

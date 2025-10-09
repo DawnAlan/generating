@@ -17,8 +17,8 @@ public class ConstraintParam {
     private String paramName;
     @Column(name = "operator", columnDefinition = "TEXT COMMENT '运算符（>,>=,=,<=,<）'")
     private String operator;
-    @Column(name = "value", columnDefinition = "DOUBLE COMMENT '值'")
-    private Double value;
+    @Column(name = "value", columnDefinition = "varchar(255) COMMENT '值'")
+    private String value;
     @Column(name = "unit", columnDefinition = "TEXT COMMENT '单位（m,m/d,m/w,m³/s,WM）'")
     private String unit;
     @Column(name = "remark", columnDefinition = "TEXT COMMENT '备注'")

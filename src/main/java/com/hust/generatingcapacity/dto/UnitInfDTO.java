@@ -1,6 +1,5 @@
 package com.hust.generatingcapacity.dto;
 
-import com.hust.generatingcapacity.model.entity.NHQCell;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -21,7 +20,7 @@ public class UnitInfDTO {
     //NHQ曲线名称
     private String curveName;
     //NHQ曲线信息
-    private List<NHQCell> nhqLine;
+    private List<NHQCellDTO> nhqLine;
 
     public UnitInfDTO(Integer id, String unitName, Double unitCapacity, Boolean status, String curveName) {
         this.id = id;

@@ -1,6 +1,6 @@
 package com.hust.generatingcapacity.tools;
 
-import com.hust.generatingcapacity.model.entity.TimeRange;
+import com.hust.generatingcapacity.model.common.TimeRange;
 
 import java.util.*;
 

@@ -1,4 +1,4 @@
-package com.hust.generatingcapacity.model.entity;
+package com.hust.generatingcapacity.model.generation.domain;
 
 import lombok.Data;
 import lombok.Getter;
@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 @Getter
 @Setter
 public class NHQCell {
+
     private double h;
     private double q;
     private double n;
@@ -41,7 +42,12 @@ public class NHQCell {
     public NHQCell() {
     }
 
+
+
     public static List<NHQData> convert(List<NHQCell> values) {
+        if (values == null || values.isEmpty()) {
+            return new ArrayList<>();
+        }
         List<NHQData> NHQDataList = values.stream()
                 .collect(Collectors.groupingBy(NHQCell::getH))
                 .entrySet()

@@ -10,8 +10,8 @@ import com.hust.generatingcapacity.repository.DispatchConstraintRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.StringJoiner;
 
 @Service
 public class DispatchConstraintService implements IDispatchConstraintService {
@@ -33,7 +33,7 @@ public class DispatchConstraintService implements IDispatchConstraintService {
                 List<ConstraintParam> params = constraintParamRepository.findByConstraintId(id);
                 //将约束转换为表达式
                 String condition = buildConditionExpression(conditions);
-                String param = buildParamExpression(params);
+                List<String> param = buildParamExpression(params);
                 constraintInfDTO.setCondition(condition);
                 constraintInfDTO.setParam(param);
             }
@@ -67,12 +67,18 @@ public class DispatchConstraintService implements IDispatchConstraintService {
      * @param params
      * @return
      */
-    private String buildParamExpression(List<ConstraintParam> params) {
-        StringJoiner joiner = new StringJoiner(" & ");
+    private List<String> buildParamExpression(List<ConstraintParam> params) {
+        List<String> paramList = new ArrayList<>();
         for (ConstraintParam c : params) {
-            joiner.add(c.getParamName() + " " + c.getOperator() + " " + c.getValue());
+            StringBuilder builder = new StringBuilder();
+            builder.append(c.getParamName())
+                    .append(" ")
+                    .append(c.getOperator())
+                    .append(" ")
+                    .append(c.getValue());
+            paramList.add(builder.toString().trim());
         }
-        return joiner.toString().trim();
+        return paramList;
     }
 
 

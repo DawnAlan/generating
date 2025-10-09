@@ -1,6 +1,6 @@
 package com.hust.generatingcapacity.dto;
 
-import com.hust.generatingcapacity.model.entity.CodeValue;
+import com.hust.generatingcapacity.model.generation.domain.CodeValue;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -27,7 +27,7 @@ public class ReservoirInfDTO {
     //最小库水位（米）
     private Double minRegulateLevel;
     //水位库容曲线
-    private List<CodeValue> reservoirStorageLine;
+    private List<CodeValueDTO> reservoirStorageLine;
 
     public ReservoirInfDTO(Integer id,String reservoirName, Double totalCapacity, Double effectiveCapacity, Double deadCapacity, Double normalWaterLevel, Double checkFloodLevel, Double minRegulateLevel) {
         this.id = id;

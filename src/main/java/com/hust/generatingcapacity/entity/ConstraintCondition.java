@@ -15,9 +15,9 @@ public class ConstraintCondition {
     private Integer id;
     @Column(name = "condition_name", columnDefinition = "TEXT COMMENT '生效条件（T-时间、H-水位、L-预见期、dL-时段、Qin-入库流量）'")
     private String conditionName;
-    @Column(name = "operator", columnDefinition = "TEXT COMMENT '运算符（>,>=,=,<=,<）'")
+    @Column(name = "operator", columnDefinition = "TEXT COMMENT '运算符（>,>=,==,<=,<）'")
     private String operator;
-    @Column(name = "connector", columnDefinition = "TEXT COMMENT '连接符（||,&）'")
+    @Column(name = "connector", columnDefinition = "TEXT COMMENT '连接符（||,&&）'")
     private String connector;
     @Column(name = "value", columnDefinition = "DOUBLE COMMENT '值'")
     private Double value;

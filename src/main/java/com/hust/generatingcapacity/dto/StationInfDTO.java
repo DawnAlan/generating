@@ -1,6 +1,6 @@
 package com.hust.generatingcapacity.dto;
 
-import com.hust.generatingcapacity.model.entity.CodeValue;
+import com.hust.generatingcapacity.model.generation.domain.CodeValue;
 import com.hust.generatingcapacity.tools.StreamUtils;
 import lombok.Data;
 import lombok.Getter;
@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static com.hust.generatingcapacity.model.entity.CodeValue.listToStringWithLimit;
+import static com.hust.generatingcapacity.model.generation.util.DisplayUtils.listToStringWithLimit;
 
 @Data
 @Getter
@@ -47,9 +47,9 @@ public class StationInfDTO {
     //水库信息包含水位库容曲线
     private ReservoirInfDTO reservoirInf;
     //水位耗水率曲线
-    private List<CodeValue> waterConsumptionLine;
+    private List<CodeValueDTO> waterConsumptionLine;
     //尾水位流量曲线(流量为code，水位为value)
-    private List<CodeValue> tailLevelFlowLine;
+    private List<CodeValueDTO> tailLevelFlowLine;
     //机组信息
     private List<UnitInfDTO> unitInfs;
     //约束信息

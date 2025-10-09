@@ -20,6 +20,10 @@ public class DispatchConstraint {
     private String constraintType;
     @Column(name = "description", columnDefinition = "TEXT COMMENT '约束描述'")
     private String description;
+    @Column(name = "is_active", columnDefinition = "bit(1) COMMENT '是否启用'")
+    private Boolean isActive;
+    @Column(name = "is_rigid", columnDefinition = "bit(1) COMMENT '是否刚性约束'")
+    private Boolean isRigid;
     // 关联父表，水电站信息
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ddh_hystation_id")

@@ -236,6 +236,21 @@ public class TimeUtils {
     }
 
     /**
+     * date1早于或者等于date2
+     * @param date1
+     * @param date2
+     * @param period
+     * @return
+     */
+    public static Boolean isBeforeOrSame(Date date1, Date date2, String period){
+        return dateCompare(date1,date2,period)||date1.before(date2);
+    }
+
+    public static Boolean isAfterOrSame(Date date1, Date date2, String period){
+        return dateCompare(date1,date2,period)||date1.after(date2);
+    }
+
+    /**
      * 添加时间
      */
     public static Date addCalendar(Date startDate, String period, int l) {

@@ -9,9 +9,18 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.*;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class ExcelUtils {
@@ -292,6 +301,11 @@ public class ExcelUtils {
     }
 
     public static void writeExcel(String fileName, String sheetName, Object[][] data) {
+        Path filePath = Paths.get(fileName);
+        if (isFileLocked(filePath)) {
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmm"));
+            fileName = fileName.replace(".xlsx", "-" + timestamp + ".xlsx");
+        }
         // 检查文件是否存在，如果不存在则创建文件
         File file = new File(fileName);
         ZipSecureFile.setMinInflateRatio(-1.0d);
@@ -379,6 +393,24 @@ public class ExcelUtils {
             }
         }
     }
+
+    public static boolean isFileLocked(Path path) {
+        if (!Files.exists(path)) {
+            System.out.println("文件不存在: " + path);
+            return false; // 或者你可以选择返回特殊状态
+        }
+        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE)) {
+            FileLock lock = channel.tryLock();  // 尝试获取锁
+            if (lock != null) {
+                lock.release();
+                return false;  // 成功加锁，说明文件没被别人占用
+            }
+        } catch (Exception e) {
+            return true;  // 加锁失败，大概率是文件正在被 Excel 占用
+        }
+        return true;
+    }
+
 
     /**
      * 检查是否为合并单元格
