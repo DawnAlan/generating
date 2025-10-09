@@ -163,7 +163,7 @@ public class CalculateTest {
         param.setL(L);
         param.setConsiderH(stationData.getIsUnderDdh() && !stationData.getNHQLines().isEmpty());
         param.setGenMin(isGenMin);
-        param.setIntervalFlow(!stationName.equals("猴子岩"));
+        param.setIntervalFlow(!stationName.equals("猴子岩"));//需要修改
         return param;
     }
 
