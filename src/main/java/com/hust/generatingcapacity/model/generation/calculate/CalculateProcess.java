@@ -1,7 +1,6 @@
 package com.hust.generatingcapacity.model.generation.calculate;
 
 import com.hust.generatingcapacity.model.generation.dispatch.ConstraintEnvBuilder;
-import com.hust.generatingcapacity.model.generation.dispatch.RuleBasedDispatch;
 import com.hust.generatingcapacity.model.generation.vo.*;
 import com.hust.generatingcapacity.model.generation.domain.ConstraintData;
 import com.hust.generatingcapacity.model.generation.domain.StationData;
@@ -169,118 +168,20 @@ public class CalculateProcess {
         return nextStep;
     }
 
-
     /**
      * 单一时段单一水库计算流程
      *
-     * @param data
+     * @param input
      * @param calParam
      * @param stationData
      * @return
      */
-    public static CalculateStep oneStepCalculate(CalculateStep data, CalculateParam calParam, StationData stationData) {
-        CalculateStep data_aft;
-        List<ParamValue> paramList;
-        ParamValue paramValue = null;
-        int maxAttempts = 10;  // 最大修正次数
-        int attempts = 0;
-        // 统计违反次数
-        List<ParamType> violationHistory = new ArrayList<>();
-        String finalViolation = "";
-        do {
-            if (paramValue != null) {
-//                System.out.println("第" + (attempts) + "次修正，违反约束参数：" + paramValue);
-                finalViolation = paramValue.getDescription();
-            }
-            data.setRevise(attempts != 0);//第二次及以后的循环为修正计算
-            switch (calParam.getDispatchType()) {
-                case RULE_BASED -> data_aft = RuleBasedDispatch.calculate(data, calParam, paramValue, stationData);
-                case AUTO -> throw new IllegalArgumentException("敬请期待自动寻优！");
-                case MANUAL -> throw new IllegalArgumentException("敬请期待设置末水位！");
-                default -> throw new IllegalArgumentException("请检查调度方式！");
-            }
-            paramList = getParamMap(data, data_aft, calParam, stationData);
-            if (!paramList.isEmpty()) {
-                paramValue = selectMostSevereParam(paramList);
-                violationHistory.add(paramValue.getParamType());
-            }
-            attempts++;
-        } while (!paramList.isEmpty() && attempts < maxAttempts || (attempts >= maxAttempts && paramValue.getParamType().getPriority() == 1));
-        //记录最近几次的约束类型集合
-        StringBuilder warnMessage = new StringBuilder();
-        if (violationHistory.size() > 2) {
-            Set<ParamType> recent = new HashSet<>(violationHistory.subList(
-                    Math.max(0, violationHistory.size() - 6), violationHistory.size()
-            ));
-            if (recent.size() > 1) {
-                warnMessage.append("警告：存在约束冲突，涉及约束类型：")
-                        .append(recent)
-                        .append(";")
-                        .append("最后满足的约束为：")
-                        .append(finalViolation)
-                        .append(";")
-                        .append("未满足的约束为：")
-                        .append(paramValue.getDescription());
-            }
-        }
-//        System.out.println(warnMessage);
-        data_aft.setRemark(warnMessage.toString());
-        return data_aft;
-    }
-
-    /**
-     * 选取最严重的约束参数
-     *
-     * @param paramList
-     * @return
-     */
-    private static ParamValue selectMostSevereParam(List<ParamValue> paramList) {
-        if (paramList == null || paramList.isEmpty()) {
-            return null;
-        }
-        //先判断硬约束，再看约束参数的优先级
-        List<ParamValue> filteredList = paramList.stream()
-                .sorted(Comparator.comparing(ParamValue::isRigid, Comparator.reverseOrder())
-                        .thenComparing((a, b) -> ParamType.comparePriority(a.getParamType(), b.getParamType())))
-                .toList();
-        return filteredList.get(0);
-    }
-
-    /**
-     * 获取被违反的约束参数
-     *
-     * @param data
-     * @param data_aft
-     * @param calParam
-     * @param stationData
-     * @return
-     */
-    private static List<ParamValue> getParamMap(CalculateStep data, CalculateStep data_aft, CalculateParam calParam, StationData stationData) {
-        //约束条件
-        Integer T = TimeUtils.getSpecificDate(data.getTime()).get("月");
-        double H = data.getLevelBef();
-        double Qin = data.getInFlow();
-        Map<String, Object> conditionEnv = new ConstraintEnvBuilder().conditionBuild(T, H, calParam.getL(), calParam.getPeriod(), Qin);
-        //约束参数
-        double H_aft = data_aft.getLevelAft();
-        double dH = H_aft - H;
-        Map<String, Object> paramEnv = new ConstraintEnvBuilder().paramBuild(H_aft, dH, data_aft.getQp(), data_aft.getQo(), 0,data.getCalGen());
-        //检查约束
-        List<ParamValue> result = new ArrayList<>();
-        List<ConstraintData> constraints = stationData.getConstraints();
-        for (ConstraintData constraint : constraints) {
-            if (constraint.isConditionActive(constraint.getCondition(), conditionEnv)) {
-                List<String> paramList = constraint.getParam();
-                Map<ParamType, Double> param = constraint.getParamConstraintValue(paramList, paramEnv, conditionEnv);
-                if (param != null && !param.isEmpty()) {
-                    for (Map.Entry<ParamType, Double> entry : param.entrySet()) {
-                        ParamValue pv = new ParamValue(entry.getKey(), entry.getValue(), constraint.getDescription(), constraint.isRigid());
-                        result.add(pv);
-                    }
-                }
-            }
-        }
-        return result;
+    public static CalculateStep oneStepCalculate(CalculateStep input, CalculateParam calParam, StationData stationData) {
+        return switch (calParam.getDispatchType()) {
+            case RULE_BASED -> RuleBasedCal.run(input, calParam, stationData);
+            case RULE_OPTIMIZE -> RuleOptimalCal.run(input, calParam, stationData);
+            case PRE_CONDITION -> throw new IllegalArgumentException("敬请期待预设条件模型！");
+        };
     }
 
 

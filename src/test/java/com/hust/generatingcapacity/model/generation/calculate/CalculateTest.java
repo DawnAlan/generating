@@ -25,13 +25,13 @@ public class CalculateTest {
 
     @Test
     public void testOneStationCal() throws ParseException {
-        String stationName = "安谷";
+        String stationName = "猴子岩";
         int L = 1;
         String period = "日";
-        Date start = sdf.parse("2020-11-01");
-        Date end = sdf.parse("2020-11-07");
+        Date start = sdf.parse("2020-11-09");
+        Date end = sdf.parse("2020-11-10");
         StationData stationData = hydropowerStationService.changeToStationData(hydropowerStationService.get(stationName));
-        Object[][] data = ExcelUtils.readExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\枯期测试-大渡河\\管辖外水电站20年枯期日尺度整合数据.xlsx", stationName);
+        Object[][] data = ExcelUtils.readExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\枯期测试-大渡河\\管辖内水电站20年枯期日尺度整合数据.xlsx", stationName);
         CalculateParam param = setCalculateParam(stationName, stationData, L, true, period);
         int length = TimeUtils.getDateDuration(start, end, "日") / L;
         List<CalculateStep> result = new ArrayList<>();

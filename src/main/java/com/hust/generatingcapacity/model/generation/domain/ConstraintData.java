@@ -1,15 +1,15 @@
 package com.hust.generatingcapacity.model.generation.domain;
 
 import com.googlecode.aviator.AviatorEvaluator;
+import com.hust.generatingcapacity.model.generation.type.ParamBoundType;
 import com.hust.generatingcapacity.model.generation.type.ParamType;
 import com.hust.generatingcapacity.model.generation.util.DisplayUtils;
+import com.hust.generatingcapacity.model.generation.vo.BoundPair;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 
 @Data
@@ -78,5 +78,95 @@ public class ConstraintData {
         return result;
     }
 
+    /**
+     * 获取打破参数约束条件的参数边界
+     *
+     * @param paramList
+     * @param conditionEnv
+     * @param initialBound
+     */
+    public void getParamBoundPair(List<String> paramList, Map<String, Object> conditionEnv, Map<ParamType, BoundPair> initialBound) {
+        if (paramList == null || paramList.isEmpty()) {
+            throw new IllegalArgumentException("请检查 " + description + " 该约束的约束参数！");
+        }
+        for (String exp : paramList) {
+            String name = DisplayUtils.getMessageFromExp(exp, "param");
+            String op = DisplayUtils.getMessageFromExp(exp, "op");
+            String vStr = DisplayUtils.getMessageFromExp(exp, "value");
+            // 解析参数名和数值
+            ParamType type = ParamType.valueOf(name);
+            double v = DisplayUtils.parseValue(vStr, conditionEnv);
+            BoundPair bp = initialBound.get(type);
+            //兜底措施
+            if (bp == null) {
+                bp = new BoundPair(ParamBoundType.getMin(name), 0.0, ParamBoundType.getMax(name), Double.MAX_VALUE); // 给个合理初始
+                initialBound.put(type, bp);
+            }
+            // 根据操作符更新边界
+            switch (op) {
+                case "<", "<=" -> bp.setMaxVal(Math.min(v, bp.getMaxVal()));
+                case ">", ">=" -> bp.setMinVal(Math.max(v, bp.getMinVal()));
+                case "==", "=" -> {
+                    bp.setMinVal(v);
+                    bp.setMaxVal(v);
+                }
+                default -> throw new IllegalArgumentException("不支持的操作符: " + op);
+            }
+        }
+        // 处理径流上下界联立关系
+        setQBoundPair(initialBound);
+    }
 
+    /**
+     * 设置径流上下界联立关系
+     *
+     * @param initialBound
+     */
+    public void setQBoundPair(Map<ParamType, BoundPair> initialBound) {
+        BoundPair Qo = initialBound.get(ParamType.Qo);
+        BoundPair Qp = initialBound.get(ParamType.Qp);
+        double min = Qp.getMinVal();
+        double max = Qo.getMaxVal();
+        Qp.setMinVal(Qo.getMinVal());
+        Qp.setMaxVal(Math.min(Qp.getMaxVal(), max));
+        Qo.setMinVal(Math.max(Qo.getMinVal(), min));
+        initialBound.put(ParamType.Qo, Qo);
+        initialBound.put(ParamType.Qp, Qp);
+    }
+
+    /**
+     * 获取第一个被打破的约束条件
+     * @param constraints
+     * @param conditionEnv
+     * @param type
+     * @param sign
+     * @return
+     */
+    public static ConstraintData getFirstViolatedConstraint(List<ConstraintData> constraints, Map<String, Object> conditionEnv, ParamType type, String sign) {
+        List<ConstraintData> violatedConstraint = new ArrayList<>();
+        for (ConstraintData constraint : constraints) {
+            // 判断条件是否生效
+            boolean isActive = constraint.isConditionActive(constraint.getCondition(), conditionEnv);
+            if (isActive) {
+                List<String> param = constraint.getParam();
+                for (String exp : param) {
+                    String name = DisplayUtils.getMessageFromExp(exp, "param");
+                    String op = DisplayUtils.getMessageFromExp(exp, "op");
+                    if (name.equals(type.name())) {
+                        if (sign.equals("下界放宽") && (op.equals(">") || op.equals(">="))) {
+                            violatedConstraint.add(constraint);
+                        }
+                        if (sign.equals("上界放宽") && (op.equals("<") || op.equals("<="))) {
+                            violatedConstraint.add(constraint);
+                        }
+                    }
+                }
+            }
+        }
+        if (violatedConstraint.isEmpty()) {
+            return null; // 没有任何约束被打破
+        } else {
+            return violatedConstraint.stream().min(Comparator.comparing(v -> v.isRigid)).get(); // 返回第一个被打破的软约束
+        }
+    }
 }

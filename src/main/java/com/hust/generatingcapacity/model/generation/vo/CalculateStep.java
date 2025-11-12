@@ -9,7 +9,7 @@ import java.util.Date;
 @Data
 @Getter
 @Setter
-public class CalculateStep implements Cloneable{
+public class CalculateStep implements Cloneable {
     //电站名称
     private String station;
     //是否为修正
@@ -37,17 +37,18 @@ public class CalculateStep implements Cloneable{
 
 
     public String toString(int i) {
-        return station+"电站，第"+i+"个时段计算结果{" +
-                ",日期=" + time +
-                ", 是否修正过=" + isRevise +
-                ", inFlow=" + inFlow +
-                ", levelBef=" + levelBef +
-                ", levelAft=" + levelAft +
-                ", head=" + head +
-                ", headAft=" + headAft +
-                ", qp=" + qp +
-                ", qo=" + qo +
-                ", calGen=" + calGen +
+        return station + "电站，第" + i + "个计算结果{" +
+                "日期=" + time +
+                ", 是否需要修正=" + isRevise +
+                ", inFlow=" + Math.round(inFlow * 100.0) / 100.0 +
+                ", levelBef=" + Math.round(levelBef * 100.0) / 100.0 +
+                ", levelAft=" + Math.round(levelAft * 100.0) / 100.0 +
+                ", head=" + Math.round(head * 100.0) / 100.0 +
+                ", headAft=" + Math.round(headAft * 100.0) / 100.0 +
+                ", qp=" + Math.round(qp * 100.0) / 100.0 +
+                ", qo=" + Math.round(qo * 100.0) / 100.0 +
+                ", calGen=" + Math.round(calGen * 100.0) / 100.0 + "(WM), \n" +
+                "remark=" + remark +
                 '}';
     }
 
@@ -66,6 +67,7 @@ public class CalculateStep implements Cloneable{
 
     /**
      * 初始计算时刻赋值
+     *
      * @param input
      */
     public CalculateStep(CalculateInput input) {

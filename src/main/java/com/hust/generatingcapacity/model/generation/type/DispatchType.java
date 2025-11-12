@@ -4,9 +4,10 @@ import lombok.Getter;
 
 @Getter
 public enum DispatchType {
-    MANUAL("人工调度"),
-    AUTO("自动调度"),
-    RULE_BASED("规则调度");
+
+    RULE_OPTIMIZE("规程优化"),
+    RULE_BASED("规则调度"),
+    PRE_CONDITION("预设条件");
 
     private final String desc;
 
@@ -16,8 +17,8 @@ public enum DispatchType {
 
     public static DispatchType fromCode(String code) {
         return switch (code.toLowerCase()) {
-            case "人工调度" -> MANUAL;
-            case "自动调度" -> AUTO;
+            case "预设条件" -> PRE_CONDITION;
+            case "规程优化" -> RULE_OPTIMIZE;
             case "规则调度" -> RULE_BASED;
             default -> throw new IllegalArgumentException("未知调度方式: " + code);
         };

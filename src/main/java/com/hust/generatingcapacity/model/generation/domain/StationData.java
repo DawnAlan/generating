@@ -1,11 +1,16 @@
 package com.hust.generatingcapacity.model.generation.domain;
 
 import com.hust.generatingcapacity.dto.StationInfDTO;
+import com.hust.generatingcapacity.model.generation.type.ParamBoundType;
+import com.hust.generatingcapacity.model.generation.type.ParamType;
+import com.hust.generatingcapacity.model.generation.vo.BoundPair;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -104,4 +109,23 @@ public class StationData {
                 ", NHQLines=" + nhqStr +
                 '}';
     }
+
+
+    /**
+     * 根据水电站信息设置初始边界
+     * @return
+     */
+    public Map<ParamType, BoundPair> setInitialBoundPair() {
+        Map<ParamType, BoundPair> initialBound = new EnumMap<>(ParamType.class);
+        initialBound.put(ParamType.Qp, new BoundPair(ParamBoundType.Qp_MIN, 0.0, ParamBoundType.Qp_MAX, Double.MAX_VALUE));
+        initialBound.put(ParamType.Qo, new BoundPair(ParamBoundType.Qo_MIN, 0.0, ParamBoundType.Qo_MAX, Double.MAX_VALUE));
+        initialBound.put(ParamType.H, new BoundPair(ParamBoundType.H_MIN, this.getMinRegulateLevel(), ParamBoundType.H_MAX, this.getCheckFloodLevel()));
+        initialBound.put(ParamType.dH, new BoundPair(ParamBoundType.dH_MIN, -Double.MAX_VALUE, ParamBoundType.dH_MAX, Double.MAX_VALUE));
+        initialBound.put(ParamType.C, new BoundPair(ParamBoundType.C_MIN, 0.0, ParamBoundType.C_MAX, Double.MAX_VALUE));
+        initialBound.put(ParamType.P, new BoundPair(ParamBoundType.P_MIN, 0.0, ParamBoundType.P_MAX, this.getInstalledCapacity()));
+        return initialBound;
+    }
+
+
+
 }

@@ -22,7 +22,8 @@ public class DisplayUtils {
         sb.append("]");
         return sb.toString();
     }
-    public static String getMessageFromExp(String exp,String type){
+
+    public static String getMessageFromExp(String exp, String type) {
         Pattern PATTERN = Pattern.compile("^(?<param>[A-Za-z][A-Za-z0-9]*)\\s*(?<op>>=|<=|>|<|==|\\+|-|\\*|/)\\s*(?<value>-?\\d+(\\.\\d+)?|∞|Infinity|-Infinity|NaN|[A-Za-z][A-Za-z0-9]*)$");
         Matcher m = PATTERN.matcher(exp);
         String param;
@@ -38,10 +39,11 @@ public class DisplayUtils {
                 case "value" -> value;
                 default -> throw new RuntimeException("类型错误，只能是param、op、value");
             };
-        }else {
+        } else {
             throw new RuntimeException("公式格式错误，公式中应包含元素参数（例：dH）: " + exp);
         }
     }
+
     public static Double parseValue(String value, Map<String, Object> env) {
         // 1. 在 env 里
         if (env.containsKey(value)) {

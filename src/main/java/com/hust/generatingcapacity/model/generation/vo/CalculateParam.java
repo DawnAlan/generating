@@ -16,7 +16,7 @@ public class CalculateParam {
     private boolean isIntervalFlow;
     //发电上下限
     private boolean isGenMin;
-    //是否考虑水头
+    //是否考虑水头变化对耗水率的影响
     private boolean isConsiderH;
     //调度方式
     private DispatchType dispatchType;
