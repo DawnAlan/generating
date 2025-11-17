@@ -26,11 +26,27 @@ public class CodeValue {
     public CodeValue() {
     }
 
+    public static List<CodeValue> enlargeStep(List<CodeValue> list, int factor) {
+        List<CodeValue> result = new ArrayList<>();
+        for (int i = 0; i < list.size(); i += factor) {
+            result.add(list.get(i));
+        }
+        if (!result.contains(list.get(list.size() - 1))) {
+            result.add(list.get(list.size() - 1)); // 确保包含尾部
+        }
+        return result;
+    }
+
     public static List<CodeValue> exchangeCopy(List<CodeValue> original) {
         List<CodeValue> result = new ArrayList<>(original.stream()
                 .map(cv -> new CodeValue(cv.getValue(), cv.getCode()))
                 .collect(Collectors.toList()));  // 先获取不可变的列表，再转换为可变列表
         return result;
+    }
+
+    public static double codeDifference(double value1, double value2, List<CodeValue> values) {
+        values = exchangeCopy(values);
+        return difference(value1, value2, values);
     }
 
     public static double difference(double code1, double code2, List<CodeValue> values) {

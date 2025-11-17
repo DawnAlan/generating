@@ -30,49 +30,63 @@ public class RuleOptimalCal {
     static Map<Variable, ParamType> varPriorityMap = new HashMap<>();
 
     public static CalculateStep run(CalculateStep data, CalculateParam calParam, StationData stationData) {
-        //调度情景
-        Map<String, Object> condition = new ConstraintEnvBuilder().conditionBuild(TimeUtils.getSpecificDate(data.getTime()).get("月"), data.getLevelBef(), calParam.getL(), calParam.getPeriod(), data.getInFlow());
-        // 1. 初算：使用完整约束
-        Map<ParamType, BoundPair> initialBound = getFirstParamBound(stationData, condition);
-        Either<CalculateStep, ExpressionsBasedModel> step = calculate(data, calParam, stationData, initialBound);
-        // 不需要修正，直接返回
-        if (step.isLeft()) {
-            return step.getLeft();
+        System.out.println("\n开始计算电站 " + calParam.getStation() + " 时段 " + TimeUtils.formatDate(data.getTime()) + " 的发电能力，" + "初始水位为：" + data.getLevelBef() + ",入库径流为：" + data.getInFlow());
+        //无库容曲线则直接规程边界计算
+        if (stationData.getReservoirStorageLine().isEmpty()) {
+            System.out.println("电站 " + calParam.getStation() + " 无库容曲线，采用规程边界模型计算发电能力。");
+            return RuleBasedCal.run(data, calParam, stationData);
         }
-        // 2. 需要修正：按优先级逐步放宽约束，直到不需要修正或轮次耗尽
-        final int typeCount = ParamType.values().length;
-        final int maxRounds = typeCount * 2;  // 软 + 硬 两轮
-        StringBuilder remarkBuilder = new StringBuilder();// 记录放宽/违反约束
-        for (int round = 1; round <= maxRounds; ) {
-            //首先尝试放宽某个参数的约束
-            ExpressionsBasedModel infeasibleModel = step.getRight();
-            Map.Entry<Variable, String> relaxedVar = getRelaxedParamBound(data, infeasibleModel, stationData, initialBound);// 放宽约束主函数
-            ParamType relaxType = varPriorityMap.get(relaxedVar.getKey());
-            ConstraintData firestViolatedCon = ConstraintData.getFirstViolatedConstraint(stationData.getConstraints(), condition, relaxType, relaxedVar.getValue());
-            Either<CalculateStep, ExpressionsBasedModel> nextStep = calculate(data, calParam, stationData, initialBound);
-            if (nextStep.isLeft()) {
-                //记录放宽信息
-                remarkBuilder.append("约束：").append(firestViolatedCon == null ? "" : firestViolatedCon.getDescription()).append(" 适当放宽，")
-                        .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(initialBound.get(relaxType).toString()).append("\n");
-                nextStep.getLeft().setRemark(remarkBuilder.toString());
-                return nextStep.getLeft();
-            } else {//开始放弃某些约束
-//                System.out.println("放宽参数后仍无法求得最优解……");
-                Map<ParamType, BoundPair> reviseBound = getRevisionParamBound(stationData, condition, firestViolatedCon, relaxType, round);
-                Either<CalculateStep, ExpressionsBasedModel> reviseStep = calculate(data, calParam, stationData, reviseBound);
-                if (reviseStep.isLeft()) {
-                    //记录放弃约束信息
-                    remarkBuilder.append("为保障发电计算模型有解，该项约束：").append(firestViolatedCon == null ? "" : firestViolatedCon.getDescription()).append("被放弃，")
-                            .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(reviseBound.get(relaxType).toString()).append("\n");
-                    reviseStep.getLeft().setRemark(remarkBuilder.toString());
-                    return reviseStep.getLeft();
-                } else {
-                    round++;
+        try {
+            //调度情景
+            Map<String, Object> condition = new ConstraintEnvBuilder().conditionBuild(TimeUtils.getSpecificDate(data.getTime()).get("月"), data.getLevelBef(), calParam.getL(), calParam.getPeriod(), data.getInFlow());
+            // 1. 初算：使用完整约束
+            Map<ParamType, BoundPair> initialBound = getFirstParamBound(stationData, condition);
+            Either<CalculateStep, ExpressionsBasedModel> step = calculate(data, calParam, stationData, initialBound);
+            // 不需要修正，直接返回
+            if (step.isLeft()) {
+                return step.getLeft();
+            }
+            // 2. 需要修正：按优先级逐步放宽约束，直到不需要修正或轮次耗尽
+            final int typeCount = ParamType.values().length;
+            final int maxRounds = typeCount * 2;  // 软 + 硬 两轮
+            StringBuilder remarkBuilder = new StringBuilder();// 记录放宽/违反约束
+            for (int round = 1; round <= maxRounds; ) {
+                //首先尝试放宽某个参数的约束
+                ExpressionsBasedModel infeasibleModel = step.getRight();
+                Map.Entry<Variable, String> relaxedVar;
+                try {
+                    relaxedVar = getRelaxedParamBound(data, infeasibleModel, stationData, initialBound);// 放宽约束主函数
+                } catch (Exception e) {//找不到需要放宽的参数则丢给规程边界模型
+                    return RuleBasedCal.run(data, calParam, stationData);
+                }
+                ParamType relaxType = varPriorityMap.get(relaxedVar.getKey());
+                ConstraintData firestViolatedCon = ConstraintData.getFirstViolatedConstraint(stationData.getConstraints(), condition, relaxType, relaxedVar.getValue());
+                Either<CalculateStep, ExpressionsBasedModel> nextStep = calculate(data, calParam, stationData, initialBound);
+                if (nextStep.isLeft()) {
+                    //记录放宽信息
+                    remarkBuilder.append("约束：").append(firestViolatedCon == null ? "" : firestViolatedCon.getDescription()).append(" 适当放宽，")
+                            .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(initialBound.get(relaxType).toString()).append("\n");
+                    nextStep.getLeft().setRemark(remarkBuilder.toString());
+                    return nextStep.getLeft();
+                } else {//开始放弃某些约束
+                    Map<ParamType, BoundPair> reviseBound = getRevisionParamBound(stationData, condition, firestViolatedCon, relaxType, round);
+                    Either<CalculateStep, ExpressionsBasedModel> reviseStep = calculate(data, calParam, stationData, reviseBound);
+                    if (reviseStep.isLeft()) {
+                        //记录放弃约束信息
+                        remarkBuilder.append("为保障发电计算模型有解，该项约束：").append(firestViolatedCon == null ? "" : firestViolatedCon.getDescription()).append("被放弃，")
+                                .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(reviseBound.get(relaxType).toString()).append("\n");
+                        reviseStep.getLeft().setRemark(remarkBuilder.toString());
+                        return reviseStep.getLeft();
+                    } else {
+                        round++;
+                    }
                 }
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        // 3. 全部放宽轮次耗尽，仍然需要修正 → 采用规程边界模型
-        return null;
+        // 3. 全部放宽轮次耗尽，仍然需要修正/内部有报错信息 → 采用规程边界模型
+        return RuleBasedCal.run(data, calParam, stationData);
     }
 
     /**
@@ -85,30 +99,47 @@ public class RuleOptimalCal {
      * @return
      */
     public static Either<CalculateStep, ExpressionsBasedModel> calculate(CalculateStep data, CalculateParam calParam, StationData stationData, Map<ParamType, BoundPair> cound) {
-//        System.out.println(cound.toString());
-        // 入库径流
+        System.out.println("此阶段参数边界：" + cound.toString());
+        // 计算所需初始运行数据
         double Qin = data.getInFlow();
-        // 时段初水位
         double Hb = data.getLevelBef();
-//        double Tailb = 1701.36;
-        // 时间间隔，单位秒
+        double Vb = CodeValue.linearInterpolation(Hb, stationData.getReservoirStorageLine()) * 1e6;//m³
         int t = calParam.getPeriod();
-
+        // 降采样水位边界，提高计算速度
+        double dHCound;
+        if (stationData.getReservoirStorageLine().isEmpty()) {
+            dHCound = cound.get(ParamType.H).getMaxVal() - cound.get(ParamType.H).getMinVal();
+        } else {
+            dHCound = CodeValue.codeDifference(Vb / 1e6, (Vb + Qin * t) / 1e6, stationData.getReservoirStorageLine());
+        }
+        double H_min = Math.min(cound.get(ParamType.H).getMinVal(), Math.round(Hb)) - Math.min(dHCound, 10.0);
+        double H_max = Math.max(cound.get(ParamType.H).getMaxVal(), Math.round(Hb)) + Math.min(dHCound, 10.0);
         //获取特征曲线
         List<CodeValue> reservoirStorageLine = stationData.getReservoirStorageLine()
                 .stream()
-                .filter(cv -> cv.getCode() >= Math.min(cound.get(ParamType.H).getMinVal(), Math.round(Hb)))
+                .filter(cv -> cv.getCode() >= H_min && cv.getCode() <= H_max)
                 .collect(Collectors.toList());
-        List<CodeValue> waterConsumptionLine = stationData.getWaterConsumptionLine();
+        reservoirStorageLine = CodeValue.enlargeStep(reservoirStorageLine, 2);
+        //耗水率
+        List<CodeValue> waterConsumptionLine = stationData.getWaterConsumptionLine().size() > 1 ?
+                stationData.getWaterConsumptionLine().stream()
+                        .filter(cv -> cv.getCode() >= H_min && cv.getCode() <= H_max)
+                        .collect(Collectors.toList()) :
+                stationData.getWaterConsumptionLine();
 
-        // 时段初库容
-        double Vb = CodeValue.linearInterpolation(Hb, reservoirStorageLine) * 1e6;
-        double Vp_min = cound.get(ParamType.Qp).getMinVal() * t;
-        double Vp_max = cound.get(ParamType.Qp).getMaxVal() * t;
-        double L_min = CodeValue.getMinValue(waterConsumptionLine) * 1e3;
-        double L_max = CodeValue.getMaxValue(waterConsumptionLine) * 1e3;
-        double genL = Math.max(cound.get(ParamType.P).getMinVal() * t / 3600, Vp_min / L_max);
-        double genU = Math.min(cound.get(ParamType.P).getMaxVal() * t / 3600, Vp_max / L_min);
+        //重新设置流量的上边界
+        double dV_max = CodeValue.difference(Hb, H_min, reservoirStorageLine) * 1e6;
+        double Q_max = Math.min(cound.get(ParamType.Qo).getMaxVal(), (Qin * t - dV_max) / t);
+        cound.get(ParamType.Qp).setMaxVal(Q_max);
+        cound.get(ParamType.Qo).setMaxVal(Q_max);
+
+        // 计算变量边界
+        double Vp_min = cound.get(ParamType.Qp).getMinVal() * t;//m³
+        double Vp_max = cound.get(ParamType.Qp).getMaxVal() * t;//m³
+        double L_min = CodeValue.getMinValue(waterConsumptionLine) * 1e3;//m³/WM*H
+        double L_max = CodeValue.getMaxValue(waterConsumptionLine) * 1e3;//m³/WM*H
+        double genL = Math.max(cound.get(ParamType.P).getMinVal() * t / 3600, Vp_min / L_max);//WM*H
+        double genU = Math.min(cound.get(ParamType.P).getMaxVal() * t / 3600, Vp_max / L_min);//WM*H
         System.setProperty("shut.up.ojAlgo", "true");
         ExpressionsBasedModel model = new ExpressionsBasedModel();
         // 发电流量
@@ -143,7 +174,6 @@ public class RuleOptimalCal {
                 .set(Qp, 1.0)    // 系数 * Qp
                 .set(Qo, -1.0);  // 系数 * Qo  => 表达式 = Qp - Qo
         constr1.upper(0.0);       // 约束: Qp - Qo ≤ 0  【即 Qp ≤ Qo】
-//        constr1.level(0.0);
 
         // 2. 水位变幅定义: dH = Ha - Hb
         Expression constr2 = model.addExpression("dH_def")
@@ -169,16 +199,20 @@ public class RuleOptimalCal {
                 .set(Qo, t);
         constr5.level(Qin * t); // 约束: dV + Qo*t = Qin*t
 
+        // 弃水软惩罚
+        double eps = calParam.isGenMin() ? 0.6 : 0.01; // 计算最小发电量时，弃水约束应增大权重
+        Variable S_spill = addVar(model, "S_spill", 0.0, cound.get(ParamType.Qo).getMaxVal());
+        Expression spill_def1 = model.addExpression("spill_ge_Qo_minus_Qp")
+                .set(S_spill, 1.0).set(Qo, -1.0).set(Qp, 1.0);
+        spill_def1.lower(0.0); // S_spill - Qo + Qp >= 0  -> S_spill >= Qo - Qp
+
 
         // 发电计算
-        Variable Lc = null;
-        double L = 0.0;
+        Variable Lc;
+        double L;
         if (calParam.isConsiderH()) {//有细致的耗水率曲线
             // 耗水率
             Lc = addVar(model, "Lc", CodeValue.getMinValue(waterConsumptionLine) * 1e3, CodeValue.getMaxValue(waterConsumptionLine) * 1e3);
-//            if (!stationData.getIsWaterConsumption()) {
-//                waterConsumptionLine.forEach(cv -> cv.setCode(cv.getCode() + Tailb));
-//            }
             CodeValue.sampleToGrid(reservoirStorageLine, waterConsumptionLine);// 重采样到同一网格
             double[] Hgrid = reservoirStorageLine.stream().mapToDouble(CodeValue::getCode).toArray();
             PiecewiseLambdas lam = addPiecewiseHa(model, Ha, Hgrid); // 构建 Ha 分段线性化骨架
@@ -189,7 +223,7 @@ public class RuleOptimalCal {
             // McCormick：Vp = Gen * L耗
             addMcCormickBilinear(model, Vp, Gen, Lc, genL, genU, L_min, L_max);
         } else {
-            L = waterConsumptionLine.get(0).getValue();
+            L = waterConsumptionLine.get(0).getValue() * 1e3;
             double[] Hgrid = reservoirStorageLine.stream().mapToDouble(CodeValue::getCode).toArray();
             PiecewiseLambdas lam = addPiecewiseHa(model, Ha, Hgrid); // 构建 Ha 分段线性化骨架
             double[] Vgrid = reservoirStorageLine.stream().mapToDouble(cv -> cv.getValue() * 1e6).toArray();
@@ -207,9 +241,11 @@ public class RuleOptimalCal {
         } else {
             Gen.weight(1.0);
         }
+        // 目标：轻微惩罚弃水
+        S_spill.weight(-eps);
 
         // 求解
-        model.options.time_abort = 300000;    // 运行 30 秒后强制停止
+        model.options.time_abort = 60000;    // 运行 1 分钟后强制停止
         model.options.iterations_abort = 1000000; // 达到最大迭代数后停止
         Optimisation.Result rs = model.maximise();
 
@@ -217,7 +253,7 @@ public class RuleOptimalCal {
 //        if (rs.getState().equals(Optimisation.State.INFEASIBLE)){//人工分析无解原因
 //            InfeasibleBoundCheck.analyse(model);
 //        }
-        data.setRemark(String.valueOf(rs.getState()));//记录此次运算状态
+//        data.setRemark(String.valueOf(rs.getState()));//记录此次运算状态
         data.setRevise(!rs.getState().isFeasible());//记录是否需要修正
         data.setLevelAft(Ha.getValue().doubleValue());
         data.setQp(Qp.getValue().doubleValue());
@@ -257,7 +293,7 @@ public class RuleOptimalCal {
      * @return
      */
     public static Map.Entry<Variable, String> getRelaxedParamBound(CalculateStep data, ExpressionsBasedModel model, StationData stationData, Map<ParamType, BoundPair> initialBound) {
-//        System.out.println("主模型不可行，开始用松弛变量法诊断矛盾约束...");
+        System.out.println("主模型不可行，开始用松弛变量法诊断矛盾约束...");
         ElasticInfeasibleDiag.SlackInfo s = ElasticInfeasibleDiag.diagnose(model);
         Expression expression = model.getExpression(s.constraintName);
         // 拿到这条表达式中，所有线性变量及参数
@@ -293,7 +329,7 @@ public class RuleOptimalCal {
             boundPair.setMinVal(boundPair.getMinVal() + changeValue);
         }
         initialBound.put(priorityType, boundPair);
-//        System.out.println("放宽参数为：" + priorityType + "，变量：" + priorityVar.get().getKey().getName() + "，变化值：" + String.format("%.4f", changeValue) + "，" + change);
+        System.out.println("放宽参数为：" + priorityType + "，变量：" + priorityVar.get().getKey().getName() + "，变化值：" + String.format("%.4f", changeValue) + "，" + change);
         return Map.entry(priorityVar.get().getKey(), change);
     }
 

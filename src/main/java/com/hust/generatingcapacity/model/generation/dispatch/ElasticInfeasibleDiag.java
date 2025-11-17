@@ -46,6 +46,14 @@ public final class ElasticInfeasibleDiag {
         // 2. 新建一个“松弛总和”的目标：min Σ slack
         Expression elasticObj = m.addExpression("__elastic_obj__").weight(1.0);
 
+//        // --- 新增：黑名单 ---
+//        final Set<String> EXPR_RELAX_BLACKLIST = Set.of(
+//                "spill_ge_Qo_minus_Qp"  // 弃水定义约束不放宽
+//        );
+//        final Set<String> VAR_RELAX_BLACKLIST = Set.of(
+//                "S_spill"               // 任何含有该软变量的约束都不放宽
+//        );
+
         // 防止遍历时结构被修改，先拷一份列表
         List<Expression> exprList = new ArrayList<>(m.getExpressions());
 
@@ -60,6 +68,27 @@ public final class ElasticInfeasibleDiag {
             if (lowerName.contains("lambda") || lowerName.contains("lam_") || lowerName.contains("seg")) {
                 continue;
             }
+
+//            if (lowerName.contains("lambda") || lowerName.contains("lam_") || lowerName.contains("seg") || lowerName.contains("mc")) {
+//                continue;
+//            }
+//            // --- 新增：按约束名黑名单跳过 ---
+//            if (EXPR_RELAX_BLACKLIST.contains(name)) {
+//                continue;
+//            }
+//
+//            // --- 新增：若约束线性部分包含黑名单变量，也跳过 ---
+//            boolean containsBlockedVar = false;
+//            for (var entry : e.getLinearEntrySet()) { // 你前面提到支持 getLinearEntrySet()
+//                var var = m.getVariable(entry.getKey());
+//                if (var != null && VAR_RELAX_BLACKLIST.contains(var.getName())) {
+//                    containsBlockedVar = true;
+//                    break;
+//                }
+//            }
+//            if (containsBlockedVar) {
+//                continue;
+//            }
 
             BigDecimal lo = e.getLowerLimit();
             BigDecimal hi = e.getUpperLimit();
@@ -238,7 +267,7 @@ public final class ElasticInfeasibleDiag {
         double lhsLo = unboundedBelow ? -BIG : minSum;
         double lhsHi = unboundedAbove ? +BIG : maxSum;
 
-        return new double[] { lhsLo, lhsHi };
+        return new double[]{lhsLo, lhsHi};
     }
 
 }

@@ -9,7 +9,89 @@ public final class InfeasibleBoundCheck {
 
     /** 核心方法：分析无解模型的边界冲突 */
     public static void analyse(ExpressionsBasedModel model) {
-        System.out.println("== 检查 Variable 上下界冲突 ==");
+        System.out.println("== 检查 NaN/Infinity（变量上下界 & 目标/约束）==");
+        for (Variable v : model.getVariables()) {
+            BigDecimal lo = v.getLowerLimit();
+            BigDecimal hi = v.getUpperLimit();
+            if (lo != null && (!lo.abs().toString().matches(".*\\d.*") || lo.toString().contains("NaN"))) {
+                System.out.println("❌ Var NaN lower: " + v.getName() + " lo=" + lo);
+            }
+            if (hi != null && (!hi.abs().toString().matches(".*\\d.*") || hi.toString().contains("NaN"))) {
+                System.out.println("❌ Var NaN upper: " + v.getName() + " hi=" + hi);
+            }
+        }
+
+        for (Expression e : model.getExpressions()) {
+            if (e.getLowerLimit() != null && (Double.isNaN(e.getLowerLimit().doubleValue()) || Double.isInfinite(e.getLowerLimit().doubleValue())))
+                System.out.println("❌ Expr NaN/Inf lower: " + e.getName());
+            if (e.getUpperLimit() != null && (Double.isNaN(e.getUpperLimit().doubleValue()) || Double.isInfinite(e.getUpperLimit().doubleValue())))
+                System.out.println("❌ Expr NaN/Inf upper: " + e.getName());
+
+            // 也扫扫系数
+            for (var kv : e.getLinearEntrySet()) {
+                BigDecimal coef = e.get(kv.getKey());
+                if (coef == null || Double.isNaN(coef.doubleValue()) || Double.isInfinite(coef.doubleValue())) {
+                    Variable vv = model.getVariable(kv.getKey());
+                    System.out.println("❌ Expr coef NaN/Inf: " + e.getName() + " * " + (vv!=null?vv.getName():kv.getKey()));
+                }
+            }
+        }
+        System.out.println("\n== 检查不等式约束的可达性（区间松弛估计）==");
+        for (Expression e : model.getExpressions()) {
+            if (!e.isConstraint()) continue;
+
+            BigDecimal minSum = BigDecimal.ZERO, maxSum = BigDecimal.ZERO;
+            for (var kv : e.getLinearEntrySet()) {
+                Variable v = model.getVariable(kv.getKey());
+                if (v == null) continue;
+                BigDecimal coef = e.get(kv.getKey());
+                BigDecimal lo = v.getLowerLimit();
+                BigDecimal hi = v.getUpperLimit();
+                // 无界就跳过这项（而不是用 1e10 伪装）
+                if (coef == null || lo == null || hi == null) {
+                    minSum = null; maxSum = null; break;
+                }
+                if (coef.signum() >= 0) {
+                    minSum = minSum.add(coef.multiply(lo));
+                    maxSum = maxSum.add(coef.multiply(hi));
+                } else {
+                    minSum = minSum.add(coef.multiply(hi));
+                    maxSum = maxSum.add(coef.multiply(lo));
+                }
+            }
+            if (minSum == null || maxSum == null) {
+                System.out.println("⚠️ " + e.getName() + " 含无界变量，跳过区间检测（若是 McCormick/λ 约束，这可能就是问题）");
+                continue;
+            }
+            BigDecimal loB = e.getLowerLimit();
+            BigDecimal hiB = e.getUpperLimit();
+            if (hiB != null && minSum.compareTo(hiB) > 0) {
+                System.out.printf("❌ 约束 %s 不可行：min(LHS)=%.6g > upper=%s%n", e.getName(), minSum.doubleValue(), hiB);
+            }
+            if (loB != null && maxSum.compareTo(loB) < 0) {
+                System.out.printf("❌ 约束 %s 不可行：max(LHS)=%.6g < lower=%s%n", e.getName(), maxSum.doubleValue(), loB);
+            }
+        }
+
+        System.out.println("\n== 检查 McCormick/分段绑定的有限界要求 ==");
+        for (Expression e : model.getExpressions()) {
+            String n = e.getName().toLowerCase();
+            boolean suspectMc = n.startsWith("mc") || n.contains("mccormick");
+            boolean suspectLam = n.contains("lambda") || n.contains("lam_") || n.contains("seg");
+
+            if (suspectMc || suspectLam) {
+                for (var kv : e.getLinearEntrySet()) {
+                    Variable v = model.getVariable(kv.getKey());
+                    if (v == null) continue;
+                    BigDecimal lo = v.getLowerLimit(), hi = v.getUpperLimit();
+                    if (lo == null || hi == null || !Double.isFinite(lo.doubleValue()) || !Double.isFinite(hi.doubleValue())) {
+                        System.out.println("❌ "+ (suspectMc?"McCormick":"Piecewise") +" 相关变量无有限界: " + (v!=null?v.getName():kv.getKey()));
+                    }
+                }
+            }
+        }
+
+        System.out.println("\n== 检查 Variable 上下界冲突 ==");
         for (Variable v : model.getVariables()) {
             BigDecimal lo = v.getLowerLimit();
             BigDecimal hi = v.getUpperLimit();

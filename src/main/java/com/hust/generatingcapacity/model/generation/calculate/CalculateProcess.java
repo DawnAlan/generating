@@ -115,6 +115,9 @@ public class CalculateProcess {
                     throw new IllegalArgumentException("请检查电站 " + station + " 的上游电站 " + upperStation + " 是否已计算！");
                 }
                 calStep.setInFlow(upperData.getQo() + calStep.getInFlow());
+//                if (station.equals("龙头石")) {
+//                    System.out.println("debug");
+//                }
                 result = oneStepCalculate(calStep, calParam, stationData);
             }
             oneStepAllStationCalculateData.put(station, result);
@@ -135,7 +138,7 @@ public class CalculateProcess {
         for (int i = 0; i < L; i++) {
             CalculateStep stepData = oneStepCalculate(calculateVO.getCalStep(), calculateVO.getCalParam(), calculateVO.getStationData());
             //逐步输出发电能力计算结果
-            System.out.println(stepData);
+            System.out.println(stepData.toString(i));
             results.add(stepData.clone());
             //准备下一时段数据
             CalculateStep nextData = getNextStepData(stepData, calculateVO.getCalInput());
@@ -177,11 +180,19 @@ public class CalculateProcess {
      * @return
      */
     public static CalculateStep oneStepCalculate(CalculateStep input, CalculateParam calParam, StationData stationData) {
-        return switch (calParam.getDispatchType()) {
-            case RULE_BASED -> RuleBasedCal.run(input, calParam, stationData);
-            case RULE_OPTIMIZE -> RuleOptimalCal.run(input, calParam, stationData);
-            case PRE_CONDITION -> throw new IllegalArgumentException("敬请期待预设条件模型！");
-        };
+        CalculateStep result = new CalculateStep();
+        switch (calParam.getDispatchType()) {
+            case RULE_BASED:
+                result = RuleBasedCal.run(input, calParam, stationData);
+                break;
+            case RULE_OPTIMIZE:
+                result = RuleOptimalCal.run(input, calParam, stationData);
+                System.out.println(stationData.getStationName() + "电站发电能力结果为：\n" + result.toString());
+                break;
+            case PRE_CONDITION:
+                throw new IllegalArgumentException("敬请期待预设条件模型！");
+        }
+        return result;
     }
 
 

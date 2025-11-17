@@ -105,20 +105,13 @@ public class RuleBasedCal {
     /**
      * 生成告警信息：最近窗口内若出现多类违反，则提示潜在冲突；同时给出“最后满足/未满足”的描述。
      */
-    private static String buildWarnMessage(Deque<ParamType> history,
-                                           ParamValue lastViolation,
-                                           List<ParamValue> currentViolations,
-                                           int window) {
+    private static String buildWarnMessage(Deque<ParamType> history, ParamValue lastViolation, List<ParamValue> currentViolations, int window) {
         if (history == null || history.isEmpty()) return "";
-
         // 去重但保留相对顺序
         LinkedHashSet<ParamType> uniq = new LinkedHashSet<>(history);
 
         String finalSatisfied = (lastViolation == null) ? "" : safeDesc(lastViolation);
-        String currentUnmet = (currentViolations == null || currentViolations.isEmpty())
-                ? ""
-                : safeDesc(selectMostSevereParam(currentViolations));
-
+        String currentUnmet = (currentViolations == null || currentViolations.isEmpty()) ? "" : safeDesc(selectMostSevereParam(currentViolations));
         StringBuilder sb = new StringBuilder();
         if (uniq.size() > 1) {
             sb.append("警告：存在约束冲突（最近").append(Math.min(window, history.size()))
