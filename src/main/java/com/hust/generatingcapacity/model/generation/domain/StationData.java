@@ -8,10 +8,7 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.hust.generatingcapacity.model.generation.util.DisplayUtils.listToStringWithLimit;
@@ -38,8 +35,8 @@ public class StationData {
     private String transmissionSection;
     //  是否归大渡河公司管辖
     private Boolean isUnderDdh;
-    //  是否留川
-    private Boolean isStaySichuan;
+    //  是否采用规程计算
+    private Boolean isProceduralCalculation;
     //  是否参与电力市场
     private Boolean isParticipateMarket;
     //  校核洪水位（米）
@@ -70,7 +67,7 @@ public class StationData {
         this.lowerStation = stationInfDTO.getLowerStation();
         this.transmissionSection = stationInfDTO.getTransmissionSection();
         this.isUnderDdh = stationInfDTO.getIsUnderDdh();
-        this.isStaySichuan = stationInfDTO.getIsStaySichuan();
+        this.isProceduralCalculation = stationInfDTO.getIsProceduralCalculation();
         this.isParticipateMarket = stationInfDTO.getIsParticipateMarket();
         if (stationInfDTO.getReservoirInf() != null) {
             this.checkFloodLevel = stationInfDTO.getReservoirInf().getCheckFloodLevel();
@@ -98,7 +95,7 @@ public class StationData {
                 ", lowerStation='" + lowerStation + '\'' +
                 ", transmissionSection='" + transmissionSection + '\'' +
                 ", isUnderDdh=" + isUnderDdh +
-                ", isStaySichuan=" + isStaySichuan +
+                ", isProceduralCalculation=" + isProceduralCalculation +
                 ", isParticipateMarket=" + isParticipateMarket +
                 ", checkFloodLevel=" + checkFloodLevel +
                 ", minRegulateLevel=" + minRegulateLevel + '\n' +
@@ -125,6 +122,27 @@ public class StationData {
         initialBound.put(ParamType.P, new BoundPair(ParamBoundType.P_MIN, 0.0, ParamBoundType.P_MAX, this.getInstalledCapacity()));
         return initialBound;
     }
+
+    public List<CodeValue> getWaterConsumptionLine() {
+        return waterConsumptionLine == null ? Collections.emptyList() : waterConsumptionLine;
+    }
+
+    public List<CodeValue> getReservoirStorageLine() {
+        return reservoirStorageLine == null ? Collections.emptyList() : reservoirStorageLine;
+    }
+
+    public List<CodeValue> getTailLevelFlowLine() {
+        return tailLevelFlowLine == null ? Collections.emptyList() : tailLevelFlowLine;
+    }
+
+    public List<ConstraintData> getConstraints() {
+        return constraints == null ? Collections.emptyList() : constraints;
+    }
+
+    public List<List<NHQData>> getNHQLines() {
+        return NHQLines == null ? Collections.emptyList() : NHQLines;
+    }
+
 
 
 

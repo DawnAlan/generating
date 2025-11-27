@@ -8,7 +8,6 @@ import com.hust.generatingcapacity.tools.ExcelUtils;
 import com.hust.generatingcapacity.tools.TimeUtils;
 import com.hust.generatingcapacity.tools.Tools;
 import org.junit.jupiter.api.Test;
-import org.mapstruct.ap.internal.gem.GemGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -17,7 +16,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 @SpringBootTest(classes = GeneratingCapacityApplication.class)
-public class CalculateTest {
+public class RuleBasedTest {
     @Autowired
     private IHydropowerStationService hydropowerStationService;
 
@@ -40,9 +39,8 @@ public class CalculateTest {
             input.setStation(stationName);
             input.setStart(TimeUtils.addCalendar(start, period, i * L));
             input.setPeriod(period);
-            input.setL(L);
-            getCalInputFromWithinExcel(data, input);
-            input.checkForecast();
+            getCalInputFromWithinExcel(data, input, L);
+            input.checkForecast(L);
             CalculateStep step = new CalculateStep(input);
             CalculateVO vo = new CalculateVO(step, input, param, stationData);
             List<CalculateStep> res = CalculateProcess.LStepCalculate(vo);
@@ -72,41 +70,42 @@ public class CalculateTest {
 
     @Test
     public void testAllStationCal() throws ParseException {
-        List<String> stations = List.of("猴子岩", "长河坝", "黄金坪", "泸定", "大岗山",
+        List<String> stations = List.of("锦屏一级", "锦屏二级", "猴子岩", "长河坝", "黄金坪", "泸定", "大岗山",
                 "龙头石", "瀑布沟", "深溪沟", "枕头坝一级", "沙坪二级",
                 "龚嘴", "铜街子", "沙湾", "安谷");
 //        List<String> stations = List.of( "安谷");
-        int L = 1;
+        int schedulingL = 1;
         String period = "日";
         Date start = sdf.parse("2020-11-01");
 //        Date end = sdf.parse("2020-11-03");
-        Date end = sdf.parse("2021-04-30");
-        allStationCal(stations, start, end, period, L, false);
-        allStationCal(stations, start, end, period, L, true);
+        Date end = sdf.parse("2020-11-30");
+        allStationCal(stations, start, end, period, "大渡河", schedulingL, false);
+        allStationCal(stations, start, end, period, "大渡河", schedulingL, true);
     }
 
-    private void allStationCal(List<String> stations, Date start, Date end, String period, int L, boolean isGenMin) {
+    private void allStationCal(List<String> stations, Date start, Date end, String period, String basin, int schedulingL, boolean isGenMin) {
         Map<String, StationData> stationDataMap = new HashMap<>();
         Map<String, Object[][]> dataMap = new HashMap<>();
         for (String stationName : stations) {
             StationData stationData = hydropowerStationService.changeToStationData(hydropowerStationService.get(stationName));
-            Object[][] data = ExcelUtils.readExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\枯期测试-大渡河\\大渡河水电站20年枯期日尺度整合数据.xlsx", stationName);
+            String basinName = stationData.getBasin();
+            Object[][] data = ExcelUtils.readExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\枯期测试-大渡河\\" + basinName + "水电站20年枯期日尺度整合数据.xlsx", stationName);
             stationDataMap.put(stationName, stationData);
             dataMap.put(stationName, data);
         }
-        int length = TimeUtils.getDateDuration(start, end, "日") / L;
+        int length = TimeUtils.getDateDuration(start, end, "日") / schedulingL;
         Map<String, List<CalculateStep>> result = new HashMap<>();
         for (int i = 0; i < length; i++) {
             Map<String, CalculateVO> map = new LinkedHashMap<>();
             for (String stationName : stations) {
-                CalculateParam calParam = setCalculateParam(stationName, stationDataMap.get(stationName), L, isGenMin, period);
-                CalculateInput input = setCalculateInput(stationName, TimeUtils.addCalendar(start, period, i * L), dataMap.get(stationName), L, period);
+                CalculateParam calParam = setCalculateParam(stationName, stationDataMap.get(stationName), schedulingL, isGenMin, period);
+                CalculateInput input = setCalculateInput(stationName, TimeUtils.addCalendar(start, period, i * schedulingL), dataMap.get(stationName), schedulingL, period);
                 CalculateStep step = new CalculateStep(input);
                 CalculateVO vo = new CalculateVO(step, input, calParam, stationDataMap.get(stationName));
                 map.put(stationName, vo);
             }
             // 当前时段所有电站的计算结果
-            Map<String, List<CalculateStep>> current = CalculateProcess.LStepAllStationCalculate(map);
+            Map<String, List<CalculateStep>> current = CalculateProcess.schedulingLStepAllStationCalculate(map, basin, schedulingL);
             // 累积到 result
             for (Map.Entry<String, List<CalculateStep>> entry : current.entrySet()) {
                 String station = entry.getKey();
@@ -118,6 +117,9 @@ public class CalculateTest {
         // 输出结果
         for (String station : stations) {
             List<CalculateStep> steps = result.get(station);
+            if (steps == null || steps.isEmpty()) {
+                break;
+            }
             Object[][] res = new Object[steps.size() + 1][];
             res[0] = new Object[]{"时间", "是否修正", "入库径流", "开始水位", "结束水位", "发电流量", "出库流量", "规程计算结果", "历史真实发电（MW*H）", "警告信息"};
             for (int i = 0; i < steps.size(); i++) {
@@ -136,9 +138,9 @@ public class CalculateTest {
                 };
             }
             if (!isGenMin) {
-                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\枯期测试-大渡河\\输出\\20年枯期日尺度最大发电能力计算结果" + "-预见期" + L + "天.xlsx", station, res);
+                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\枯期测试-大渡河\\输出\\20年枯期日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
             } else {
-                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\枯期测试-大渡河\\输出\\20年枯期日尺度最小发电能力计算结果" + "-预见期" + L + "天.xlsx", station, res);
+                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\枯期测试-大渡河\\输出\\20年枯期日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
             }
 
         }
@@ -150,32 +152,30 @@ public class CalculateTest {
         input.setStation(stationName);
         input.setStart(date);
         input.setPeriod(period);
-        input.setL(L);
-        getCalInputFromExcel(data, input);
-        input.checkForecast();
+        getCalInputFromExcel(data, input, L);
+        input.checkForecast(L);
         return input;
     }
 
     private static CalculateParam setCalculateParam(String stationName, StationData stationData, int L, Boolean isGenMin, String period) {
         CalculateParam param = new CalculateParam();
         param.setStation(stationName);
-        param.setPeriod(CalculateInput.changePeriod(period));
-        param.setL(L);
+        param.setPeriod(CalculateParam.changePeriod(period));
+        param.setSchedulingL(L);
         param.setConsiderH(stationData.getIsUnderDdh() && !stationData.getNHQLines().isEmpty());
         param.setGenMin(isGenMin);
-        param.setIntervalFlow(!stationName.equals("猴子岩"));//需要修改
+        param.setIntervalFlow(!(stationName.equals("猴子岩") || stationName.equals("锦屏一级") || stationName.equals("锦屏二级")));//需要修改
         return param;
     }
 
-    private static void getCalInputFromExcel(Object[][] data, CalculateInput input) {
+    private static void getCalInputFromExcel(Object[][] data, CalculateInput input, int L) {
         Object[][] filterData = Arrays.stream(data)
                 .skip(1)
                 .filter(d -> TimeUtils.isAfterOrSame((Date) d[0], input.getStart(), input.getPeriod()))
-                .limit(input.getL())
+                .limit(L)
                 .toArray(Object[][]::new);
         input.setWaterLevel(Tools.changeObjToDouble(filterData[0][3]));
         input.setTailLevel(Tools.changeObjToDouble(filterData[0][4]));
-        input.setFinalLevel(Tools.changeObjToDouble(filterData[filterData.length - 1][3]));
         input.setInFlows(Arrays.stream(filterData).map(d -> new PreFlow((Date) d[0], Tools.changeObjToDouble(d[1]))).toList());
     }
 
@@ -185,15 +185,14 @@ public class CalculateTest {
      * @param data
      * @param input
      */
-    private static void getCalInputFromWithinExcel(Object[][] data, CalculateInput input) {
+    private static void getCalInputFromWithinExcel(Object[][] data, CalculateInput input, int L) {
         Object[][] filterData = Arrays.stream(data)
                 .skip(1)
                 .filter(d -> TimeUtils.isAfterOrSame((Date) d[1], input.getStart(), input.getPeriod()))
-                .limit(input.getL())
+                .limit(L)
                 .toArray(Object[][]::new);
         input.setWaterLevel(Tools.changeObjToDouble(filterData[0][4]));
         input.setTailLevel(Tools.changeObjToDouble(filterData[0][5]));
-        input.setFinalLevel(Tools.changeObjToDouble(filterData[filterData.length - 1][4]));
         input.setInFlows(Arrays.stream(filterData).map(d -> new PreFlow((Date) d[1], Tools.changeObjToDouble(d[2]))).toList());
     }
 

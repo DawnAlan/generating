@@ -21,7 +21,7 @@ import java.util.*;
 
 
 @SpringBootTest(classes = GeneratingCapacityApplication.class)
-public class LinearProgramTest {
+public class RuleOptimalTest {
     @Autowired
     private IHydropowerStationService hydropowerStationService;
 
@@ -52,8 +52,8 @@ public class LinearProgramTest {
         calParam.setGenMin(false);
         calParam.setConsiderH(true);
         calParam.setStation("猴子岩");
-        calParam.setL(1);
-        data = RuleOptimalCal.run(data, calParam, stationData);
+        calParam.setSchedulingL(1);
+        data = RuleOptimalCal.run(new CalculateVO(data, calParam, stationData));
         Assertions.assertNotNull(data);
         System.out.println(data.toString(1));
     }
@@ -84,9 +84,8 @@ public class LinearProgramTest {
             input.setStation(stationName);
             input.setStart(TimeUtils.addCalendar(start, period, i * L));
             input.setPeriod(period);
-            input.setL(L);
-            getCalInputFromExcel(data, input);
-            input.checkForecast();
+            getCalInputFromExcel(data, input,L);
+            input.checkForecast(L);
             CalculateStep step = new CalculateStep(input);
             CalculateVO vo = new CalculateVO(step, input, param, stationData);
             List<CalculateStep> res = CalculateProcess.LStepCalculate(vo);//多时段计算
@@ -126,12 +125,12 @@ public class LinearProgramTest {
         String period = "日";
         Date start = sdf.parse("2020-11-01");
 //        Date end = sdf.parse("2020-11-03");
-        Date end = sdf.parse("2021-04-30");
-//        allStationCal(stations, start, end, period, L, false);
-        allStationCal(stations, start, end, period, L, true);
+        Date end = sdf.parse("2020-11-30");
+        allStationCal(stations, start, end, period, "大渡河", L, false);
+        allStationCal(stations, start, end, period, "大渡河", L, true);
     }
 
-    private void allStationCal(List<String> stations, Date start, Date end, String period, int L, boolean isGenMin) {
+    private void allStationCal(List<String> stations, Date start, Date end, String period, String basin, int L, boolean isGenMin) {
         Map<String, StationData> stationDataMap = new HashMap<>();
         Map<String, Object[][]> dataMap = new HashMap<>();
         for (String stationName : stations) {
@@ -145,7 +144,6 @@ public class LinearProgramTest {
         for (int i = 0; i < length; i++) {
             Map<String, CalculateVO> map = new LinkedHashMap<>();
             for (String stationName : stations) {
-
                 CalculateParam calParam = setCalculateParam(stationName, stationDataMap.get(stationName), L, isGenMin, period);
                 CalculateInput input = setCalculateInput(stationName, TimeUtils.addCalendar(start, period, i * L), dataMap.get(stationName), L, period);
                 CalculateStep step = new CalculateStep(input);
@@ -153,7 +151,7 @@ public class LinearProgramTest {
                 map.put(stationName, vo);
             }
             // 当前时段所有电站的计算结果
-            Map<String, List<CalculateStep>> current = CalculateProcess.LStepAllStationCalculate(map);
+            Map<String, List<CalculateStep>> current = CalculateProcess.schedulingLStepAllStationCalculate(map, basin, L);
             // 累积到 result
             for (Map.Entry<String, List<CalculateStep>> entry : current.entrySet()) {
                 String station = entry.getKey();
@@ -197,9 +195,8 @@ public class LinearProgramTest {
         input.setStation(stationName);
         input.setStart(date);
         input.setPeriod(period);
-        input.setL(L);
-        getCalInputFromExcel(data, input);
-        input.checkForecast();
+        getCalInputFromExcel(data, input,L);
+        input.checkForecast(L);
         return input;
     }
 
@@ -207,43 +204,25 @@ public class LinearProgramTest {
         CalculateParam param = new CalculateParam();
         param.setDispatchType(DispatchType.RULE_OPTIMIZE);
         param.setStation(stationName);
-        param.setPeriod(CalculateInput.changePeriod(period));
-        param.setL(L);
+        param.setPeriod(CalculateParam.changePeriod(period));
+        param.setSchedulingL(L);
         param.setConsiderH(stationData.getIsUnderDdh() && !stationData.getNHQLines().isEmpty());
         param.setGenMin(isGenMin);
         param.setIntervalFlow(!stationName.equals("猴子岩"));//需要修改
         return param;
     }
 
-    private static void getCalInputFromExcel(Object[][] data, CalculateInput input) {
+    private static void getCalInputFromExcel(Object[][] data, CalculateInput input,int L) {
         Object[][] filterData = Arrays.stream(data)
                 .skip(1)
                 .filter(d -> TimeUtils.isAfterOrSame((Date) d[0], input.getStart(), input.getPeriod()))
-                .limit(input.getL())
+                .limit(L)
                 .toArray(Object[][]::new);
         input.setWaterLevel(Tools.changeObjToDouble(filterData[0][3]));
         input.setTailLevel(Tools.changeObjToDouble(filterData[0][4]));
-        input.setFinalLevel(Tools.changeObjToDouble(filterData[filterData.length - 1][3]));
         input.setInFlows(Arrays.stream(filterData).map(d -> new PreFlow((Date) d[0], Tools.changeObjToDouble(d[1]))).toList());
     }
 
-    /**
-     * 管辖内的数据结构
-     *
-     * @param data
-     * @param input
-     */
-    private static void getCalInputFromWithinExcel(Object[][] data, CalculateInput input) {
-        Object[][] filterData = Arrays.stream(data)
-                .skip(1)
-                .filter(d -> TimeUtils.isAfterOrSame((Date) d[1], input.getStart(), input.getPeriod()))
-                .limit(input.getL())
-                .toArray(Object[][]::new);
-        input.setWaterLevel(Tools.changeObjToDouble(filterData[0][4]));
-        input.setTailLevel(Tools.changeObjToDouble(filterData[0][5]));
-        input.setFinalLevel(Tools.changeObjToDouble(filterData[filterData.length - 1][4]));
-        input.setInFlows(Arrays.stream(filterData).map(d -> new PreFlow((Date) d[1], Tools.changeObjToDouble(d[2]))).toList());
-    }
 
 
 }

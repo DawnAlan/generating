@@ -2,6 +2,7 @@ package com.hust.generatingcapacity.service;
 
 import com.hust.generatingcapacity.dto.*;
 import com.hust.generatingcapacity.iservice.*;
+import com.hust.generatingcapacity.model.generation.calculate.CalDevelopmentProcess;
 import com.hust.generatingcapacity.model.generation.domain.NHQCell;
 import com.hust.generatingcapacity.model.generation.domain.NHQData;
 import com.hust.generatingcapacity.model.generation.domain.StationData;
@@ -10,8 +11,8 @@ import com.hust.generatingcapacity.repository.HydropowerStationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class HydropowerStationService implements IHydropowerStationService {
@@ -52,6 +53,31 @@ public class HydropowerStationService implements IHydropowerStationService {
         result.setUnitInfs(unitInfs);
         result.setConstraintInfs(constraintInfs);
         return result;
+    }
+
+    @Override
+    public List<StationBaseInfDTO> getBasinStations(String basinName) {
+        List<String> stationNames = hydropowerStationRepository.findAllStationByBasin(basinName);
+        List<StationBaseInfDTO> result = new ArrayList<>();
+        for (String stationName : stationNames) {
+            StationInfDTO stationInfDTO = this.get(stationName);
+            StationBaseInfDTO baseInfDTO = changeToStationBaseInfDTO(stationInfDTO);
+            result.add(baseInfDTO);
+        }
+        result = CalDevelopmentProcess.topoSortOneBasin(result);
+        return result;
+    }
+
+
+
+    private StationBaseInfDTO changeToStationBaseInfDTO(StationInfDTO stationInfDTO) {
+        StationBaseInfDTO baseInfDTO = new StationBaseInfDTO(stationInfDTO);
+        baseInfDTO.setIsReservoirInf(!stationInfDTO.getReservoirInf().getReservoirStorageLine().isEmpty());
+        baseInfDTO.setIsWaterConsumptionLine(!stationInfDTO.getWaterConsumptionLine().isEmpty());
+        baseInfDTO.setIsTailLevelFlowLine(!stationInfDTO.getTailLevelFlowLine().isEmpty());
+        baseInfDTO.setIsConstraintInfs(!stationInfDTO.getConstraintInfs().isEmpty());
+        baseInfDTO.setIsUnitInfs(!stationInfDTO.getUnitInfs().isEmpty());
+        return  baseInfDTO;
     }
 
     @Override

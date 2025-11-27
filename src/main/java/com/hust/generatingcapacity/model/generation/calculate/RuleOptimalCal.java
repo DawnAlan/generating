@@ -9,10 +9,7 @@ import com.hust.generatingcapacity.model.generation.domain.ConstraintData;
 import com.hust.generatingcapacity.model.generation.domain.StationData;
 import com.hust.generatingcapacity.model.generation.type.ParamType;
 import com.hust.generatingcapacity.model.generation.util.DisplayUtils;
-import com.hust.generatingcapacity.model.generation.vo.BoundPair;
-import com.hust.generatingcapacity.model.generation.vo.CalculateParam;
-import com.hust.generatingcapacity.model.generation.vo.CalculateStep;
-import com.hust.generatingcapacity.model.generation.vo.PiecewiseLambdas;
+import com.hust.generatingcapacity.model.generation.vo.*;
 import com.hust.generatingcapacity.tools.TimeUtils;
 import org.ojalgo.optimisation.Expression;
 import org.ojalgo.optimisation.ExpressionsBasedModel;
@@ -29,16 +26,19 @@ public class RuleOptimalCal {
     //变量优先级排序（与影响变量的参数优先级一致）
     static Map<Variable, ParamType> varPriorityMap = new HashMap<>();
 
-    public static CalculateStep run(CalculateStep data, CalculateParam calParam, StationData stationData) {
+    public static CalculateStep run(CalculateVO calculateVO) {
+        CalculateStep data = calculateVO.getCalStep();
+        CalculateParam calParam = calculateVO.getCalParam();
+        StationData stationData = calculateVO.getStationData();
         System.out.println("\n开始计算电站 " + calParam.getStation() + " 时段 " + TimeUtils.formatDate(data.getTime()) + " 的发电能力，" + "初始水位为：" + data.getLevelBef() + ",入库径流为：" + data.getInFlow());
         //无库容曲线则直接规程边界计算
         if (stationData.getReservoirStorageLine().isEmpty()) {
             System.out.println("电站 " + calParam.getStation() + " 无库容曲线，采用规程边界模型计算发电能力。");
-            return RuleBasedCal.run(data, calParam, stationData);
+            return RuleBasedCal.run(calculateVO);
         }
         try {
             //调度情景
-            Map<String, Object> condition = new ConstraintEnvBuilder().conditionBuild(TimeUtils.getSpecificDate(data.getTime()).get("月"), data.getLevelBef(), calParam.getL(), calParam.getPeriod(), data.getInFlow());
+            Map<String, Object> condition = new ConstraintEnvBuilder().conditionBuild(TimeUtils.getSpecificDate(data.getTime()).get("月"), data.getLevelBef(), calParam.getSchedulingL(), calParam.getPeriod(), data.getInFlow());
             // 1. 初算：使用完整约束
             Map<ParamType, BoundPair> initialBound = getFirstParamBound(stationData, condition);
             Either<CalculateStep, ExpressionsBasedModel> step = calculate(data, calParam, stationData, initialBound);
@@ -57,7 +57,7 @@ public class RuleOptimalCal {
                 try {
                     relaxedVar = getRelaxedParamBound(data, infeasibleModel, stationData, initialBound);// 放宽约束主函数
                 } catch (Exception e) {//找不到需要放宽的参数则丢给规程边界模型
-                    return RuleBasedCal.run(data, calParam, stationData);
+                    return RuleBasedCal.run(calculateVO);
                 }
                 ParamType relaxType = varPriorityMap.get(relaxedVar.getKey());
                 ConstraintData firestViolatedCon = ConstraintData.getFirstViolatedConstraint(stationData.getConstraints(), condition, relaxType, relaxedVar.getValue());
@@ -86,7 +86,7 @@ public class RuleOptimalCal {
             e.printStackTrace();
         }
         // 3. 全部放宽轮次耗尽，仍然需要修正/内部有报错信息 → 采用规程边界模型
-        return RuleBasedCal.run(data, calParam, stationData);
+        return RuleBasedCal.run(calculateVO);
     }
 
     /**
@@ -396,8 +396,8 @@ public class RuleOptimalCal {
         List<ConstraintData> constraints = stationData.getConstraints();
         List<String> paramExprList = new ArrayList<>();
         if (firstViolatedCon == null) {//需要调整的参数没有找到对应的约束
-            List<ConstraintData> rigidConstraints = constraints.stream().filter(ConstraintData::isRigid).toList();
-            List<ConstraintData> nonRigidConstraints = constraints.stream().filter(c -> !c.isRigid()).toList();
+            List<ConstraintData> rigidConstraints = constraints.stream().filter(ConstraintData::getRigid).toList();
+            List<ConstraintData> nonRigidConstraints = constraints.stream().filter(c -> !c.getRigid()).toList();
             //本次剔除哪种参数约束
             int typeCount = ParamType.values().length;
             Set<ParamType> excludedTypes;

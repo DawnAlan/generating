@@ -21,5 +21,6 @@ public interface DTOMapper {
     List<CodeValue> toCodeValueList(List<CodeValueDTO> codeValueDTOs);
     //快速生成ConstraintData的映射方法
     ConstraintData toConstraintData(ConstraintInfDTO constraintInfDTO);
+
     List<ConstraintData> toConstraintDataList(List<ConstraintInfDTO> constraintInfDTOs);
 }

@@ -19,49 +19,31 @@ public class CalculateInput {
     private Date start;
     //尺度
     private String period;
-    //预见期
-    private Integer L;
     //入库径流
     private List<PreFlow> inFlows;
     //开始水位
-    private Double waterLevel;
+    private double waterLevel;
     //开始尾水位
-    private Double tailLevel;
-    //预见期结束水位
-    private Double finalLevel;
+    private double tailLevel = -10086.0;
 
-    //预见期和入库径流长度一致性检查
-    public void checkForecast() {
+    //调度期和入库径流长度一致性检查
+    public void checkForecast(Integer schedulingL) {
+        this.inFlows = this.inFlows.stream()
+                .filter(preFlow -> TimeUtils.dateCompare(start, preFlow.getTime(), this.period) || preFlow.getTime().after(start))
+                .sorted(Comparator.comparing(PreFlow::getTime))
+                .toList();
         int flowL = this.inFlows.size();
-        if (flowL >= L) {
-            this.inFlows = this.inFlows.stream()
-                    .filter(preFlow -> TimeUtils.dateCompare(start, preFlow.getTime(), this.period) || preFlow.getTime().after(start))
-                    .sorted(Comparator.comparing(PreFlow::getTime))
-                    .toList();
-            if (this.inFlows.size() >= L) {
-                this.inFlows = this.inFlows.subList(0, L);
-            } else {
-                this.L = this.inFlows.size();
-                System.out.println(station + " 水电站预见期长度大于入库径流预报长度，已调整预见期长度为 " + this.L);
-            }
+        if (flowL >= schedulingL) {
+            this.inFlows = this.inFlows.subList(0, schedulingL);
         } else {
-            this.L = this.inFlows.size();
-            System.out.println(station + " 水电站预见期长度大于入库径流预报长度，已调整预见期长度为 " + this.L);
-        }
-        if (this.L <= 0) {
-            throw new IllegalArgumentException(station + " 水电站预见期长度为0，请检查入库径流数据！");
+            int needL = schedulingL - flowL;
+            PreFlow lastFlow = this.inFlows.get(flowL - 1);
+            for (int i = 1; i <= needL; i++) {
+                Date newTime = TimeUtils.addCalendar(lastFlow.getTime(), this.period, i);
+                this.inFlows.add(new PreFlow(newTime, lastFlow.getInFlow()));
+            }
         }
     }
 
-    //尺度转换为秒
-    public static Integer changePeriod(String period) {
-        return switch (period) {
-            case "小时" -> 3600;
-            case "日" -> 86400;
-            case "月" -> 2678400;
-            case "年" -> 31536000;
-            default -> throw new IllegalArgumentException("请检查时间尺度！");
-        };
-    }
 
 }

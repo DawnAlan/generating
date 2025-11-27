@@ -2,15 +2,6 @@ spring:
   application:
     name: GeneratingCapacity
 
-  profiles:
-    active: test   # 当前环境
-
----
-spring:
-  config:
-    activate:
-      on-profile: test
-
   servlet:
     multipart:
       max-file-size: 10MB
@@ -32,7 +23,7 @@ spring:
     open-in-view: false          # 禁掉 Open-in-View，避免警告 + 性能坑
     show-sql: false
     hibernate:
-      ddl-auto: none             # 开发调试用 update，稳定后建议改为 none
+      ddl-auto: update           # 开发调试用 update，稳定后建议改为 none
     properties:
       hibernate:
         format_sql: true
@@ -51,8 +42,10 @@ spring:
     time-zone: Asia/Shanghai
     mapper:
       accept-case-insensitive-properties: true
+
   main:
-    lazy-initialization: true     # Bean 延迟初始化，加快启动
+    # 先关闭全局延迟初始化，方便我们看 Controller 有没有被正常创建
+    lazy-initialization: false
 
 server:
   port: 8088
@@ -60,8 +53,5 @@ server:
 
 logging:
   level:
-    root: warn
-    org.springframework.boot.autoconfigure: warn
     org.hibernate.SQL: off
     org.hibernate.type.descriptor.sql.BasicBinder: off
-

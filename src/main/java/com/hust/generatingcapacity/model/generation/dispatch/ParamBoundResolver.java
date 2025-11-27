@@ -2,16 +2,12 @@ package com.hust.generatingcapacity.model.generation.dispatch;
 
 import com.hust.generatingcapacity.model.generation.domain.ConstraintData;
 import com.hust.generatingcapacity.model.generation.domain.StationData;
-import com.hust.generatingcapacity.model.generation.type.ParamBoundType;
-import com.hust.generatingcapacity.model.generation.type.ParamType;
-import com.hust.generatingcapacity.model.generation.vo.BoundPair;
 import com.hust.generatingcapacity.model.generation.vo.CalculateParam;
 import com.hust.generatingcapacity.model.generation.vo.CalculateStep;
 import com.hust.generatingcapacity.model.generation.vo.ParamValue;
 import com.hust.generatingcapacity.tools.TimeUtils;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,7 +21,7 @@ public class ParamBoundResolver {
         Integer T = TimeUtils.getSpecificDate(data.getTime()).get("月");
         double H = data.getLevelBef();
         double Qin = data.getInFlow();
-        Map<String, Object> conditionEnv = new ConstraintEnvBuilder().conditionBuild(T, H, calParam.getL(), calParam.getPeriod(), Qin);
+        Map<String, Object> conditionEnv = new ConstraintEnvBuilder().conditionBuild(T, H, calParam.getSchedulingL(), calParam.getPeriod(), Qin);
         //检查约束
         List<ParamValue> result = new ArrayList<>();
         List<ConstraintData> constraints = stationData.getConstraints();

@@ -39,10 +39,10 @@ public class HydropowerStation {// 水电站信息
     private String lowerStation;
     @Column(name = "is_under_ddh", columnDefinition = "bit(1) COMMENT '是否归大渡河公司管辖'")
     private Boolean isUnderDdh;
-    @Column(name = "is_stay_sichuan", columnDefinition = "bit(1) COMMENT '是否留川'")
-    private Boolean isStaySichuan;
-    @Column(name = "is_participate_market", columnDefinition = "bit(1) COMMENT '是否参与电力市场'")
+    @Column(name = "is_participate_market", columnDefinition = "bit(1) COMMENT '是否参与四川电力市场'")
     private Boolean isParticipateMarket;
+    @Column(name = "is_procedural_calculation", columnDefinition = "bit(1) COMMENT '是否启用规程计算'")
+    private Boolean isProceduralCalculation;
 
     // 关联子表，水库特征信息
     @OneToOne(mappedBy = "hydropowerStation", cascade = CascadeType.ALL, orphanRemoval = true)

@@ -3,19 +3,20 @@ package com.hust.generatingcapacity.model.generation.calculate;
 import com.hust.generatingcapacity.model.generation.dispatch.ConstraintEnvBuilder;
 import com.hust.generatingcapacity.model.generation.domain.*;
 import com.hust.generatingcapacity.model.generation.type.ParamType;
-import com.hust.generatingcapacity.model.generation.util.DisplayUtils;
-import com.hust.generatingcapacity.model.generation.vo.BoundPair;
 import com.hust.generatingcapacity.model.generation.vo.CalculateParam;
 import com.hust.generatingcapacity.model.generation.vo.CalculateStep;
+import com.hust.generatingcapacity.model.generation.vo.CalculateVO;
 import com.hust.generatingcapacity.model.generation.vo.ParamValue;
 import com.hust.generatingcapacity.tools.TimeUtils;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class RuleBasedCal {
 
-    public static CalculateStep run(CalculateStep data, CalculateParam calParam, StationData stationData) {
+    public static CalculateStep run(CalculateVO calculateVO) {
+        CalculateStep data = calculateVO.getCalStep();
+        CalculateParam calParam = calculateVO.getCalParam();
+        StationData stationData = calculateVO.getStationData();
         // ——配置——
         final int MAX_ATTEMPTS = 10;
         final int CONFLICT_WINDOW = 6; // 最近N次用于冲突判断
@@ -68,7 +69,7 @@ public class RuleBasedCal {
         Integer T = TimeUtils.getSpecificDate(data.getTime()).get("月");
         double H = data.getLevelBef();
         double Qin = data.getInFlow();
-        Map<String, Object> conditionEnv = new ConstraintEnvBuilder().conditionBuild(T, H, calParam.getL(), calParam.getPeriod(), Qin);
+        Map<String, Object> conditionEnv = new ConstraintEnvBuilder().conditionBuild(T, H, calParam.getSchedulingL(), calParam.getPeriod(), Qin);
         //约束参数
         double H_aft = data_aft.getLevelAft();
         double dH = H_aft - H;
@@ -82,7 +83,7 @@ public class RuleBasedCal {
                 Map<ParamType, Double> param = constraint.getParamConstraintValue(paramList, paramEnv, conditionEnv);
                 if (param != null && !param.isEmpty()) {
                     for (Map.Entry<ParamType, Double> entry : param.entrySet()) {
-                        ParamValue pv = new ParamValue(entry.getKey(), entry.getValue(), constraint.getDescription(), constraint.isRigid());
+                        ParamValue pv = new ParamValue(entry.getKey(), entry.getValue(), constraint.getDescription(), constraint.getRigid());
                         result.add(pv);
                     }
                 }

@@ -19,7 +19,7 @@ public class ConstraintData {
     //约束类型
     private String constraintType;
     //是否为硬约束
-    private boolean isRigid;
+    private Boolean rigid;
     //约束描述
     private String description;
     //生效条件
@@ -166,7 +166,7 @@ public class ConstraintData {
         if (violatedConstraint.isEmpty()) {
             return null; // 没有任何约束被打破
         } else {
-            return violatedConstraint.stream().min(Comparator.comparing(v -> v.isRigid)).get(); // 返回第一个被打破的软约束
+            return violatedConstraint.stream().min(Comparator.comparing(v -> v.rigid)).get(); // 返回第一个被打破的软约束
         }
     }
 }

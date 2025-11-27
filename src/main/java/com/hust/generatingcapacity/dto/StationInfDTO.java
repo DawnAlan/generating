@@ -39,9 +39,9 @@ public class StationInfDTO {
     private String lowerStation;
     //是否归大渡河公司管辖
     private Boolean isUnderDdh;
-    //是否留川
-    private Boolean isStaySichuan;
-    //是否参与电力市场
+    //是否采用规程计算
+    private Boolean isProceduralCalculation;
+    //是否参与四川电力市场
     private Boolean isParticipateMarket;
     //水库信息包含水位库容曲线
     private ReservoirInfDTO reservoirInf;
@@ -57,7 +57,7 @@ public class StationInfDTO {
     private List<ConstraintInfDTO> constraintInfs;
 
     public StationInfDTO(String stationName, Double stationCode, String basin, Double longitude, Double latitude, Integer status, Double installedCapacity, String regulationPerformance,
-                         String transmissionSection, String upperStation, String lowerStation, Boolean isUnderDdh, Boolean isStaySichuan, Boolean isParticipateMarket) {
+                         String transmissionSection, String upperStation, String lowerStation, Boolean isUnderDdh, Boolean isProceduralCalculation, Boolean isParticipateMarket) {
         this.stationName = stationName;
         this.stationCode = stationCode;
         this.basin = basin;
@@ -70,7 +70,7 @@ public class StationInfDTO {
         this.upperStation = upperStation;
         this.lowerStation = lowerStation;
         this.isUnderDdh = isUnderDdh;
-        this.isStaySichuan = isStaySichuan;
+        this.isProceduralCalculation = isProceduralCalculation;
         this.isParticipateMarket = isParticipateMarket;
     }
 

@@ -15,7 +15,7 @@ public class ConstraintInfDTO {
     //约束类型
     private String constraintType;
     //硬性约束
-    private Boolean isRigid;
+    private Boolean rigid;
     //约束描述
     private String description;
     //生效条件
@@ -23,11 +23,11 @@ public class ConstraintInfDTO {
     //约束参数
     private List<String> param;
 
-    public ConstraintInfDTO(Integer id, String constraintType, String description, Boolean isRigid) {
+    public ConstraintInfDTO(Integer id, String constraintType, String description, Boolean rigid) {
         this.id = id;
         this.constraintType = constraintType;
         this.description = description;
-        this.isRigid = isRigid;
+        this.rigid = rigid;
     }
 
     public ConstraintInfDTO() {
