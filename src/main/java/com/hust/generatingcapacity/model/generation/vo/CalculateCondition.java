@@ -19,4 +19,12 @@ public class CalculateCondition {
     public Date endTime;
     //预设条件值
     public Double preValue;
+
+    public CalculateCondition() {
+    }
+
+    public CalculateCondition(PreConditionType preCondition, String station) {
+        this.preCondition = preCondition;
+        this.station = station;
+    }
 }

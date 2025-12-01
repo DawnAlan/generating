@@ -3,10 +3,8 @@ package com.hust.generatingcapacity.model.generation.calculate;
 import com.hust.generatingcapacity.model.generation.dispatch.ConstraintEnvBuilder;
 import com.hust.generatingcapacity.model.generation.domain.*;
 import com.hust.generatingcapacity.model.generation.type.ParamType;
-import com.hust.generatingcapacity.model.generation.vo.CalculateParam;
-import com.hust.generatingcapacity.model.generation.vo.CalculateStep;
-import com.hust.generatingcapacity.model.generation.vo.CalculateVO;
-import com.hust.generatingcapacity.model.generation.vo.ParamValue;
+import com.hust.generatingcapacity.model.generation.type.PreConditionType;
+import com.hust.generatingcapacity.model.generation.vo.*;
 import com.hust.generatingcapacity.tools.TimeUtils;
 
 import java.util.*;
@@ -17,9 +15,27 @@ public class RuleBasedCal {
         CalculateStep data = calculateVO.getCalStep();
         CalculateParam calParam = calculateVO.getCalParam();
         StationData stationData = calculateVO.getStationData();
+        //将水库的特征信息作为常生效的约束条件
+        Map<ParamType, BoundPair> initialBoundPair = stationData.setInitialBoundPair();
+        if (initialBoundPair != null && !initialBoundPair.isEmpty()) {
+            List<String> param = new LinkedList<>();
+            for (Map.Entry<ParamType, BoundPair> entry : initialBoundPair.entrySet()) {
+                BoundPair boundPair = entry.getValue();
+                param.add(boundPair.toParamMinString(calParam.getPeriod()));
+                param.add(boundPair.toParamMaxString(calParam.getPeriod()));
+            }
+            String condition = "dL >= 1"; // 恒真条件
+            ConstraintData constraintData = new ConstraintData();
+            constraintData.setConstraintType("水库特征约束");
+            constraintData.setRigid(true);
+            constraintData.setDescription("水库特征约束");
+            constraintData.setCondition(condition);
+            constraintData.setParam(param);
+            stationData.getConstraints().add(constraintData);
+        }
         // ——配置——
-        final int MAX_ATTEMPTS = 10;
-        final int CONFLICT_WINDOW = 6; // 最近N次用于冲突判断
+        final int MAX_ATTEMPTS = 6;
+        final int CONFLICT_WINDOW = 3; // 最近N次用于冲突判断
         // ——状态——
         CalculateStep curr = data;
         ParamValue lastViolation = null;            // 本轮判定出的“最严重违反”

@@ -31,7 +31,19 @@ public class PreConditionCal {
         List<CodeValue> reservoirStorageLine = stationData.getReservoirStorageLine();
         List<CodeValue> waterConsumptionLine = stationData.getWaterConsumptionLine();
         //计算过程
-        double Qo = calCondition.getPreValue();
+        double Qo = calCondition.getPreValue() == null ? data.getInFlow() : calCondition.getPreValue();
+        if (reservoirStorageLine.isEmpty()) {//无库容曲线，按水头不变计算
+            double Lc = CodeValue.linearInterpolation(data.getLevelBef(), waterConsumptionLine);
+            double qpMax = stationData.getInstalledCapacity() / 3.6 * Lc;
+            double Qp = Math.min(Qo, qpMax);
+            double gen = Qp * calParam.getPeriod() / Lc / 1e3;//(MW*H)
+            //预设出库流量计算
+            data.setQp(Qp);
+            data.setQo(Qo);
+            data.setCalGen(gen);
+            data.setLevelAft(data.getLevelBef());
+            return data;
+        }
         double storageBef = CodeValue.linearInterpolation(data.getLevelBef(), reservoirStorageLine);
         double dV = (data.getInFlow() - Qo) * calParam.getPeriod();
         double storageAfter = storageBef + dV / 1e6;
@@ -45,7 +57,7 @@ public class PreConditionCal {
         } else {
             qpMax = stationData.getInstalledCapacity() / 3.6 * Lc;
         }
-        double Qp = Math.min(calCondition.getPreValue(), qpMax);
+        double Qp = Math.min(Qo, qpMax);
         double gen = Qp * calParam.getPeriod() / Lc / 1e3;//(MW*H)
         //预设出库流量计算
         data.setQp(Qp);

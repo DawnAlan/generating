@@ -3,6 +3,7 @@ package pre_processing;
 import com.hust.generatingcapacity.model.common.TimeRange;
 import com.hust.generatingcapacity.tools.ExcelUtils;
 import com.hust.generatingcapacity.tools.PreProcessUtils;
+import com.hust.generatingcapacity.tools.Tools;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -130,7 +131,7 @@ public class HisFlow {
 //            }
 //        }
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH");
-            TimeRange timeRange = new TimeRange(sdf.parse("2023-11-01 00"), sdf.parse("2024-04-30 23"));
+            TimeRange timeRange = new TimeRange(sdf.parse("2023-01-01 00"), sdf.parse("2023-12-31 23"));
             List<Integer> splits = new ArrayList<>();
 //        splits.add(15000016);
 //        splits.add(15000007);
@@ -142,6 +143,9 @@ public class HisFlow {
 //        splits.add(30000028);
             String fileName2 = "D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\径流资料\\历史资料\\管辖内水电站23年枯期日尺度整合数据.xlsx";
             Object[][] result = PreProcessUtils.splitData(data1, splitsPositions, timeRange, splitMessages);
+            for (int i = 1; i < result.length; i++) {
+                result[i][result[i].length - 1] = Tools.changeObjToDouble(result[i][result[i].length - 1])*10; // 发电量单位转换为MWh
+            }
             ExcelUtils.writeExcel(fileName2, sheetName, result);
             StringBuilder sb = new StringBuilder();
             if (!timeRange.isEmpty()) {

@@ -26,6 +26,15 @@ public class CalculateInput {
     //开始尾水位
     private double tailLevel = -10086.0;
 
+    public CalculateInput(String station, Date start, String period) {
+        this.station = station;
+        this.start = start;
+        this.period = period;
+    }
+
+    public CalculateInput() {
+    }
+
     //调度期和入库径流长度一致性检查
     public void checkForecast(Integer schedulingL) {
         this.inFlows = this.inFlows.stream()

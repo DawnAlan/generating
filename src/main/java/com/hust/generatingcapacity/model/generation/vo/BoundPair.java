@@ -29,6 +29,23 @@ public class BoundPair {
     public String toString() {
         return Math.round(minVal * 100.0) / 100.0 + "<= " + this.max.variable() + " <=" + Math.round(maxVal * 100.0) / 100.0;
     }
+
+    public String toParamMinString(int period) {
+        if (this.min.variable().equals("P")) {
+            return this.max.variable() + ">= " + Math.round(minVal * period / 3600.0 * 100.0) / 100.0;
+        }else {
+            return this.max.variable() + ">= " + Math.round(minVal * 100.0) / 100.0;
+        }
+
+    }
+
+    public String toParamMaxString(int period) {
+        if (this.max.variable().equals("P")) {
+            return this.max.variable() + " <=" + Math.round(maxVal * period / 3600.0 * 100.0) / 100.0;
+        }else {
+            return this.max.variable() + " <=" + Math.round(maxVal * 100.0) / 100.0;
+        }
+    }
 }
 
 

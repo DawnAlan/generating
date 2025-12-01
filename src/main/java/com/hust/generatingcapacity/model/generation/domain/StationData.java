@@ -33,6 +33,8 @@ public class StationData {
     private String lowerStation;
     // 输电断面
     private String transmissionSection;
+    // 输电断面容量
+    private Double transmissionCapacity = Double.MAX_VALUE;
     //  是否归大渡河公司管辖
     private Boolean isUnderDdh;
     //  是否采用规程计算
@@ -118,9 +120,13 @@ public class StationData {
         initialBound.put(ParamType.Qo, new BoundPair(ParamBoundType.Qo_MIN, 0.0, ParamBoundType.Qo_MAX, Double.MAX_VALUE));
         initialBound.put(ParamType.H, new BoundPair(ParamBoundType.H_MIN, this.getMinRegulateLevel(), ParamBoundType.H_MAX, this.getCheckFloodLevel()));
         initialBound.put(ParamType.dH, new BoundPair(ParamBoundType.dH_MIN, -Double.MAX_VALUE, ParamBoundType.dH_MAX, Double.MAX_VALUE));
-        initialBound.put(ParamType.C, new BoundPair(ParamBoundType.C_MIN, 0.0, ParamBoundType.C_MAX, Double.MAX_VALUE));
-        initialBound.put(ParamType.P, new BoundPair(ParamBoundType.P_MIN, 0.0, ParamBoundType.P_MAX, this.getInstalledCapacity()));
+        initialBound.put(ParamType.C, new BoundPair(ParamBoundType.C_MIN, 0.0, ParamBoundType.C_MAX, this.getTransmissionCapacity()));
+        initialBound.put(ParamType.P, new BoundPair(ParamBoundType.P_MIN, 0.0, ParamBoundType.P_MAX, Math.min(this.getInstalledCapacity(),this.getTransmissionCapacity())));
         return initialBound;
+    }
+
+    public String getLowerStation() {
+        return lowerStation == null ? "" : lowerStation;
     }
 
     public List<CodeValue> getWaterConsumptionLine() {

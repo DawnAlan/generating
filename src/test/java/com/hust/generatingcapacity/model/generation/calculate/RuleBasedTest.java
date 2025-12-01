@@ -27,11 +27,11 @@ public class RuleBasedTest {
         String stationName = "猴子岩";
         int L = 1;
         String period = "日";
-        Date start = sdf.parse("2020-11-09");
+        Date start = sdf.parse("2020-11-01");
         Date end = sdf.parse("2020-11-10");
         StationData stationData = hydropowerStationService.changeToStationData(hydropowerStationService.get(stationName));
         Object[][] data = ExcelUtils.readExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\枯期测试-大渡河\\管辖内水电站20年枯期日尺度整合数据.xlsx", stationName);
-        CalculateParam param = setCalculateParam(stationName, stationData, L, true, period);
+        CalculateParam param = setCalculateParam(stationName, stationData, L, false, period);
         int length = TimeUtils.getDateDuration(start, end, "日") / L;
         List<CalculateStep> result = new ArrayList<>();
         for (int i = 0; i < length; i++) {
@@ -70,7 +70,7 @@ public class RuleBasedTest {
 
     @Test
     public void testAllStationCal() throws ParseException {
-        List<String> stations = List.of("锦屏一级", "锦屏二级", "猴子岩", "长河坝", "黄金坪", "泸定", "大岗山",
+        List<String> stations = List.of("猴子岩", "长河坝", "黄金坪", "泸定", "大岗山",
                 "龙头石", "瀑布沟", "深溪沟", "枕头坝一级", "沙坪二级",
                 "龚嘴", "铜街子", "沙湾", "安谷");
 //        List<String> stations = List.of( "安谷");
@@ -78,7 +78,7 @@ public class RuleBasedTest {
         String period = "日";
         Date start = sdf.parse("2020-11-01");
 //        Date end = sdf.parse("2020-11-03");
-        Date end = sdf.parse("2020-11-30");
+        Date end = sdf.parse("2021-04-30");
         allStationCal(stations, start, end, period, "大渡河", schedulingL, false);
         allStationCal(stations, start, end, period, "大渡河", schedulingL, true);
     }
