@@ -5,7 +5,6 @@ import com.hust.generatingcapacity.dto.StationBaseInfDTO;
 import com.hust.generatingcapacity.dto.StationInfDTO;
 import com.hust.generatingcapacity.iservice.IHydropowerStationService;
 import com.hust.generatingcapacity.model.generation.domain.StationData;
-import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

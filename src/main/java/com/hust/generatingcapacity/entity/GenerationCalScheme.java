@@ -22,7 +22,7 @@ public class GenerationCalScheme {
     private Date creatTime = new Date();
     @Column(name = "description", columnDefinition = "TEXT COMMENT '描述'")
     private String description;
-    @Column(name = "scheme_name", columnDefinition = "TEXT COMMENT '方案名称'")
+    @Column(name = "scheme_name", nullable = false, unique = true, columnDefinition = "TEXT COMMENT '方案名称'")
     private String schemeName;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Column(name = "start_date", columnDefinition = "datetime COMMENT '开始计算时间'")

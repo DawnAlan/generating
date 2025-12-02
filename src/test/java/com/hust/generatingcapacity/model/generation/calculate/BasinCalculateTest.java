@@ -27,10 +27,10 @@ public class BasinCalculateTest {
 
     @Test
     void basinRuleBasedTest() {
-        String basin = "雅砻江";
+        String basin = "大渡河";
         String DispatchType = "规则调度";
-        Date start = sdf.parse("2023-01-01", new java.text.ParsePosition(0));
-        Date end = sdf.parse("2023-12-31", new java.text.ParsePosition(0));
+        Date start = sdf.parse("2023-07-07", new java.text.ParsePosition(0));
+        Date end = sdf.parse("2023-07-09", new java.text.ParsePosition(0));
         int schedulingL = 1;
         String period = "日";
         boolean isGenMin = false; //是否计算最小发电能力
@@ -125,9 +125,9 @@ public class BasinCalculateTest {
                     };
                 }
                 if (!isGenMin) {
-                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + DispatchType + "输出\\2023年日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "输出\\2023年日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
                 } else {
-                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + DispatchType + "输出\\2023年日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "输出\\2023年日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
                 }
             }
             genMin++;

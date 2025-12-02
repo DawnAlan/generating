@@ -2,10 +2,7 @@ package com.hust.generatingcapacity.controller;
 
 import com.hust.generatingcapacity.config.ResponseMessage;
 import com.hust.generatingcapacity.dto.GenerationCalSchemeDTO;
-import com.hust.generatingcapacity.dto.StationInfDTO;
-import com.hust.generatingcapacity.iservice.IBasinCalculateService;
 import com.hust.generatingcapacity.iservice.IGenerationCalSchemeService;
-import com.hust.generatingcapacity.model.generation.domain.StationData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

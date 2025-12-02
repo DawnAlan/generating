@@ -128,14 +128,14 @@ public class CalculateProcess {
             }
         }
         //进行目标流域内所有电站计算
-        Map<String, CalculateVO> oneStepOneBasinAllStationCalculate = new LinkedHashMap<>();
+        Map<String, CalculateVO> oneStepOneBasinCalculateVO = new LinkedHashMap<>();
         for (String station : calMap.keySet()) {
             StationData stationData = calMap.get(station).getStationData();
             if (stationData.getBasin().equals(basin)) {
-                oneStepOneBasinAllStationCalculate.put(station, calMap.get(station));
+                oneStepOneBasinCalculateVO.put(station, calMap.get(station));
             }
         }
-        return oneStepOneBasinAllStationCalculate(oneStepOneBasinAllStationCalculate, multipleUpperStationCalculateData);
+        return oneStepOneBasinAllStationCalculate(oneStepOneBasinCalculateVO, multipleUpperStationCalculateData);
     }
 
 
@@ -145,11 +145,11 @@ public class CalculateProcess {
      * @return
      */
     public static Map<String, CalculateStep> oneStepOneBasinAllStationCalculate(Map<String, CalculateVO> calMap, List<CalculateStep> otherBasinCalSteps) {
-        Map<String, CalculateStep> oneStepAllStationCalculateData = new HashMap<>();
+        Map<String, CalculateStep> oneStepAllStationCalculateData = new LinkedHashMap<>();
         //上游电站计算结果暂存
         String upperStation = "";
         for (String station : calMap.keySet()) {
-            CalculateStep calStep = calMap.get(station).getCalStep();
+            CalculateStep calStep = calMap.get(station).getCalStep().clone();
             CalculateParam calParam = calMap.get(station).getCalParam();
             StationData stationData = calMap.get(station).getStationData();
             if (calStep == null || calParam == null || stationData == null) {

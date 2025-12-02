@@ -1,7 +1,6 @@
 package com.hust.generatingcapacity.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.hust.generatingcapacity.entity.GenerationCalBasinOut;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;

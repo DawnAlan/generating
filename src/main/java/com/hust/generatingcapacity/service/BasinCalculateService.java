@@ -49,7 +49,9 @@ public class BasinCalculateService implements IBasinCalculateService {
     @Override
     @Async("generationExecutor")
     public void basinCalculate(GenerationCalSchemeDTO generationCalSchemeDTO) {
-        List<GenerationCalBasinOutDTO> generationCalBasinOutDTOs = new ArrayList<>();
+        GenerationCalScheme scheme = new GenerationCalScheme();
+        BeanUtils.copyProperties(generationCalSchemeDTO, scheme);
+//        List<GenerationCalBasinOutDTO> generationCalBasinOutDTOs = new ArrayList<>();
         String basin = generationCalSchemeDTO.getBasin();
         String dispatchType = generationCalSchemeDTO.getDispatchType();
         Date start = generationCalSchemeDTO.getStartDate();
@@ -119,9 +121,9 @@ public class BasinCalculateService implements IBasinCalculateService {
                 }
             }
             //记录至表格
-            recordExcelResults(stationDataMap.keySet(), dataMap, result, isGenMin, dispatchType, period, schedulingL);
+            recordExcelResults(stationDataMap.keySet(), dataMap, result, isGenMin, generationCalSchemeDTO);
             //记录至数据库
-            recordResults(generationCalSchemeDTO, basin, result, isGenMin, dispatchType, period);
+            recordResults(scheme, basin, result, isGenMin, dispatchType, period);
 //            generationCalBasinOutDTOs.addAll(basinOutDTOList);
         }
 //        generationCalSchemeDTO.setGenerationCalBasinOuts(generationCalBasinOutDTOs);
@@ -153,16 +155,15 @@ public class BasinCalculateService implements IBasinCalculateService {
     /**
      * 记录结果到数据库
      *
-     * @param generationCalSchemeDTO
+     * @param scheme
      * @param basin
      * @param result
      * @param isGenMin
      * @param dispatchType
      * @param period
      */
-    private void recordResults(GenerationCalSchemeDTO generationCalSchemeDTO, String basin, Map<String, List<CalculateStep>> result, boolean isGenMin, String dispatchType, String period) {
-        GenerationCalScheme scheme = new GenerationCalScheme();
-        BeanUtils.copyProperties(generationCalSchemeDTO, scheme);
+    private void recordResults(GenerationCalScheme scheme, String basin, Map<String, List<CalculateStep>> result, boolean isGenMin, String dispatchType, String period) {
+
         List<GenerationCalBasinOut> generationCalBasinOuts = new ArrayList<>();//当前一个一个流域进行计算
         //各时段结果铺平
         List<CalculateStep> allSteps = result.values().stream()
@@ -226,11 +227,12 @@ public class BasinCalculateService implements IBasinCalculateService {
      * @param dataMap
      * @param result
      * @param isGenMin
-     * @param DispatchType
-     * @param period
-     * @param schedulingL
      */
-    private static void recordExcelResults(Set<String> stationDataMapKeySet, Map<String, Object[][]> dataMap, Map<String, List<CalculateStep>> result, boolean isGenMin, String DispatchType, String period, int schedulingL) {
+    private static void recordExcelResults(Set<String> stationDataMapKeySet, Map<String, Object[][]> dataMap, Map<String, List<CalculateStep>> result, boolean isGenMin, GenerationCalSchemeDTO dto) {
+        String period = dto.getPeriod();
+        String basin = dto.getBasin();
+        String DispatchType = dto.getDispatchType();
+        int schedulingL = dto.getSchemeL();
         for (String station : stationDataMapKeySet) {
             List<CalculateStep> steps = result.get(station);
             if (steps == null || steps.isEmpty()) {
@@ -254,9 +256,9 @@ public class BasinCalculateService implements IBasinCalculateService {
                 };
             }
             if (!isGenMin) {
-                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + DispatchType + "输出\\2023年日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "输出\\" + dto.getSchemeName() + "日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
             } else {
-                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + DispatchType + "输出\\2023年日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "输出\\" + dto.getSchemeName() + "日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
             }
         }
     }
