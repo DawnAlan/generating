@@ -42,9 +42,9 @@ public class StationData {
     //  是否参与电力市场
     private Boolean isParticipateMarket;
     //  校核洪水位（米）
-    private Double checkFloodLevel;
+    private Double checkFloodLevel = Double.MAX_VALUE;
     //  最小库水位（米）
-    private Double minRegulateLevel;
+    private Double minRegulateLevel = 0.0;
     //  约束信息
     private List<ConstraintData> constraints;
     //  水位库容曲线

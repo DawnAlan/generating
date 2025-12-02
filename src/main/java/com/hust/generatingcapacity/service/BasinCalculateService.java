@@ -1,38 +1,61 @@
-package com.hust.generatingcapacity.model.generation.calculate;
+package com.hust.generatingcapacity.service;
 
-import com.hust.generatingcapacity.GeneratingCapacityApplication;
+import com.hust.generatingcapacity.dto.GenerationCalBasinOutDTO;
+import com.hust.generatingcapacity.dto.GenerationCalSchemeDTO;
+import com.hust.generatingcapacity.dto.GenerationCalStationOutDTO;
 import com.hust.generatingcapacity.dto.StationBaseInfDTO;
+import com.hust.generatingcapacity.entity.GenerationCalBasinOut;
+import com.hust.generatingcapacity.entity.GenerationCalScheme;
+import com.hust.generatingcapacity.entity.GenerationCalStationOut;
+import com.hust.generatingcapacity.iservice.IBasinCalculateService;
 import com.hust.generatingcapacity.iservice.IHydropowerStationService;
+import com.hust.generatingcapacity.model.generation.calculate.CalDevelopmentProcess;
+import com.hust.generatingcapacity.model.generation.calculate.CalculateProcess;
 import com.hust.generatingcapacity.model.generation.domain.StationData;
+import com.hust.generatingcapacity.model.generation.type.DispatchType;
 import com.hust.generatingcapacity.model.generation.vo.*;
+import com.hust.generatingcapacity.repository.GenerationCalBasinOutRepository;
+import com.hust.generatingcapacity.repository.GenerationCalSchemeRepository;
+import com.hust.generatingcapacity.repository.GenerationCalStationOutRepository;
 import com.hust.generatingcapacity.repository.HydropowerStationRepository;
 import com.hust.generatingcapacity.tools.ExcelUtils;
 import com.hust.generatingcapacity.tools.TimeUtils;
 import com.hust.generatingcapacity.tools.Tools;
-import org.junit.jupiter.api.Test;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
-@SpringBootTest(classes = GeneratingCapacityApplication.class)
-public class BasinCalculateTest {
+@Service
+public class BasinCalculateService implements IBasinCalculateService {
+
     @Autowired
     private IHydropowerStationService hydropowerStationService;
     @Autowired
     private HydropowerStationRepository hydropowerStationRepository;
+    @Autowired
+    private GenerationCalSchemeRepository generationCalSchemeRepository;
+    @Autowired
+    private GenerationCalStationOutRepository generationCalStationOutRepository;
+    @Autowired
+    private GenerationCalBasinOutRepository generationCalBasinOutRepository;
 
     static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 
-    @Test
-    void basinRuleBasedTest() {
-        String basin = "雅砻江";
-        String DispatchType = "规则调度";
-        Date start = sdf.parse("2023-01-01", new java.text.ParsePosition(0));
-        Date end = sdf.parse("2023-12-31", new java.text.ParsePosition(0));
-        int schedulingL = 1;
-        String period = "日";
+    @Override
+    @Async("generationExecutor")
+    public void basinCalculate(GenerationCalSchemeDTO generationCalSchemeDTO) {
+        List<GenerationCalBasinOutDTO> generationCalBasinOutDTOs = new ArrayList<>();
+        String basin = generationCalSchemeDTO.getBasin();
+        String dispatchType = generationCalSchemeDTO.getDispatchType();
+        Date start = generationCalSchemeDTO.getStartDate();
+        Date end = generationCalSchemeDTO.getEndDate();
+        int schedulingL = generationCalSchemeDTO.getSchemeL();
+        String period = generationCalSchemeDTO.getPeriod();
         boolean isGenMin = false; //是否计算最小发电能力
         //获取各流域电站数据
         Map<String, List<StationData>> basinStationDataMap = getStationDataMap(basin);
@@ -42,23 +65,17 @@ public class BasinCalculateTest {
                 stationDataMap.put(stationData.getStationName(), stationData);
             });
         });
-        Map<String, Object[][]> dataMap = new HashMap<>();
-        for (String stationName : stationDataMap.keySet()) {
-            String basinName = stationDataMap.get(stationName).getBasin();
-            Object[][] data = new Object[0][0];
-            try {
-                data = ExcelUtils.readExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basinName + "\\" + basinName + "水电站2023年日尺度整合数据.xlsx", stationName);
-            } catch (Exception e) {
-                System.out.println(e.getMessage());
-            }
-            dataMap.put(stationName, data);
-        }
+        //从表格中获取数据
+        Map<String, Object[][]> dataMap = setdataMap(stationDataMap);
         Map<String, List<CalculateStep>> result = new HashMap<>();
         //计算单一方案
         int number = TimeUtils.getDateDuration(start, end, period);
         for (int genMin = 0; genMin <= 1; genMin++) {
             if (genMin > 0) {
                 isGenMin = true;
+            }
+            if (dispatchType.equals("预设条件")) {
+                genMin++;
             }
             for (int i = 0; i < number; i++) {//计算多个方案
                 Date startDate = TimeUtils.addCalendar(start, period, i);
@@ -85,7 +102,7 @@ public class BasinCalculateTest {
                 calculateDevelopment.setBasin(basin);
                 calculateDevelopment.setStartDate(startDate);
                 calculateDevelopment.setEndDate(endDate);
-                calculateDevelopment.setDispatchType(DispatchType);
+                calculateDevelopment.setDispatchType(dispatchType);
                 calculateDevelopment.setPeriod(period);
                 calculateDevelopment.setCalculateInputs(calculateInputs);
                 calculateDevelopment.setCalculateConditions(null); //预设条件的时候在赋值
@@ -102,37 +119,146 @@ public class BasinCalculateTest {
                 }
             }
             //记录至表格
-            for (String station : stationDataMap.keySet()) {
-                List<CalculateStep> steps = result.get(station);
-                if (steps == null || steps.isEmpty()) {
-                    break;
-                }
-                Object[][] res = new Object[steps.size() + 1][];
-                res[0] = new Object[]{"时间", "是否修正", "入库径流", "开始水位", "结束水位", "发电流量", "出库流量", "规程计算结果", "历史真实发电（MW*H）", "警告信息"};
-                for (int i = 0; i < steps.size(); i++) {
-                    int finalI = i;
-                    Object value = Arrays.stream(dataMap.get(station))
-                            .skip(1)
-                            .filter(d -> TimeUtils.dateCompare((Date) ((Object[]) d)[0], steps.get(finalI).getTime(), period))
-                            .findFirst()   // 返回 Optional<Object>
-                            .map(d -> ((Object[]) d)[5])  // 取下标
-                            .orElse(null); // 如果没找到，返回 null
-                    res[i + 1] = new Object[]{
-                            steps.get(i).getTime(), steps.get(i).isRevise(), steps.get(i).getInFlow(),
-                            steps.get(i).getLevelBef(), steps.get(i).getLevelAft(),
-                            steps.get(i).getQp(), steps.get(i).getQo(),
-                            steps.get(i).getCalGen(), value, steps.get(i).getRemark()
-                    };
-                }
-                if (!isGenMin) {
-                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + DispatchType + "输出\\2023年日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
-                } else {
-                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + DispatchType + "输出\\2023年日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
-                }
-            }
-            genMin++;
+            recordExcelResults(stationDataMap.keySet(), dataMap, result, isGenMin, dispatchType, period, schedulingL);
+            //记录至数据库
+            recordResults(generationCalSchemeDTO, basin, result, isGenMin, dispatchType, period);
+//            generationCalBasinOutDTOs.addAll(basinOutDTOList);
         }
+//        generationCalSchemeDTO.setGenerationCalBasinOuts(generationCalBasinOutDTOs);
+//        return generationCalSchemeDTO;
+    }
 
+
+    /**
+     * 从Excel中读取各电站数据
+     *
+     * @param stationDataMap
+     * @return
+     */
+    private static Map<String, Object[][]> setdataMap(Map<String, StationData> stationDataMap) {
+        Map<String, Object[][]> dataMap = new HashMap<>();
+        for (String stationName : stationDataMap.keySet()) {
+            String basinName = stationDataMap.get(stationName).getBasin();
+            Object[][] data = new Object[0][0];
+            try {
+                data = ExcelUtils.readExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basinName + "\\" + basinName + "水电站2023年日尺度整合数据.xlsx", stationName);
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+            dataMap.put(stationName, data);
+        }
+        return dataMap;
+    }
+
+    /**
+     * 记录结果到数据库
+     *
+     * @param generationCalSchemeDTO
+     * @param basin
+     * @param result
+     * @param isGenMin
+     * @param dispatchType
+     * @param period
+     */
+    private void recordResults(GenerationCalSchemeDTO generationCalSchemeDTO, String basin, Map<String, List<CalculateStep>> result, boolean isGenMin, String dispatchType, String period) {
+        GenerationCalScheme scheme = new GenerationCalScheme();
+        BeanUtils.copyProperties(generationCalSchemeDTO, scheme);
+        List<GenerationCalBasinOut> generationCalBasinOuts = new ArrayList<>();//当前一个一个流域进行计算
+        //各时段结果铺平
+        List<CalculateStep> allSteps = result.values().stream()
+                .flatMap(List::stream)
+                .toList();
+        Map<Date, Map<String, CalculateStep>> byTimeAndStation =
+                allSteps.stream()
+                        .collect(Collectors.groupingBy(
+                                cs -> TimeUtils.cleanDate(cs.getTime(), period),
+                                TreeMap::new,
+                                Collectors.toMap(
+                                        CalculateStep::getStation,
+                                        cs -> cs,
+                                        (a, b) -> a
+                                )
+                        ));
+        //按时段进行保存
+        for (Date date : byTimeAndStation.keySet()) {
+            GenerationCalBasinOut basinOut = new GenerationCalBasinOut();
+            basinOut.setBasin(basin);
+            basinOut.setTime(date);
+            basinOut.setGenerationCalScheme(scheme);
+            //流域内电站保存
+            Map<String, CalculateStep> stationStepMap = byTimeAndStation.get(date);
+            if (stationStepMap == null || stationStepMap.isEmpty()) {//防守
+                continue;
+            }
+            List<GenerationCalStationOut> stationOuts = new ArrayList<>();
+            for (CalculateStep step : stationStepMap.values()) {
+                GenerationCalStationOut generationCalStationOut = new GenerationCalStationOut(step, isGenMin, DispatchType.fromCode(dispatchType));
+                generationCalStationOut.setGenerationCalBasinOut(basinOut);
+                stationOuts.add(generationCalStationOut);
+            }
+            basinOut.setGenerationCalStationOuts(stationOuts);
+            generationCalBasinOuts.add(basinOut);
+        }
+        scheme.setGenerationCalBasinOuts(generationCalBasinOuts);
+        generationCalSchemeRepository.save(scheme);
+//        //返回DTO
+//        List<GenerationCalBasinOutDTO> generationCalBasinOutDTOs = new ArrayList<>();
+//        for (GenerationCalBasinOut basinOut : generationCalBasinOuts) {
+//            List<GenerationCalStationOut> stationOuts = basinOut.getGenerationCalStationOuts();
+//            List<GenerationCalStationOutDTO> stationOutDTOs = new ArrayList<>();
+//            for (GenerationCalStationOut stationOut : stationOuts) {
+//                GenerationCalStationOutDTO stationOutDTO = new GenerationCalStationOutDTO();
+//                BeanUtils.copyProperties(stationOut, stationOutDTO);
+//                stationOutDTOs.add(stationOutDTO);
+//            }
+//            GenerationCalBasinOutDTO basinOutDTO = new GenerationCalBasinOutDTO();
+//            BeanUtils.copyProperties(basinOut, basinOutDTO);
+//            basinOutDTO.setGenerationCalStationOuts(stationOutDTOs);
+//            generationCalBasinOutDTOs.add(basinOutDTO);
+//        }
+//        return generationCalBasinOutDTOs;
+    }
+
+    /**
+     * 记录结果到Excel
+     *
+     * @param stationDataMapKeySet
+     * @param dataMap
+     * @param result
+     * @param isGenMin
+     * @param DispatchType
+     * @param period
+     * @param schedulingL
+     */
+    private static void recordExcelResults(Set<String> stationDataMapKeySet, Map<String, Object[][]> dataMap, Map<String, List<CalculateStep>> result, boolean isGenMin, String DispatchType, String period, int schedulingL) {
+        for (String station : stationDataMapKeySet) {
+            List<CalculateStep> steps = result.get(station);
+            if (steps == null || steps.isEmpty()) {
+                break;
+            }
+            Object[][] res = new Object[steps.size() + 1][];
+            res[0] = new Object[]{"时间", "是否修正", "入库径流", "开始水位", "结束水位", "发电流量", "出库流量", "规程计算结果", "历史真实发电（MW*H）", "警告信息"};
+            for (int i = 0; i < steps.size(); i++) {
+                int finalI = i;
+                Object value = Arrays.stream(dataMap.get(station))
+                        .skip(1)
+                        .filter(d -> TimeUtils.dateCompare((Date) ((Object[]) d)[0], steps.get(finalI).getTime(), period))
+                        .findFirst()   // 返回 Optional<Object>
+                        .map(d -> ((Object[]) d)[5])  // 取下标
+                        .orElse(null); // 如果没找到，返回 null
+                res[i + 1] = new Object[]{
+                        steps.get(i).getTime(), steps.get(i).isRevise(), steps.get(i).getInFlow(),
+                        steps.get(i).getLevelBef(), steps.get(i).getLevelAft(),
+                        steps.get(i).getQp(), steps.get(i).getQo(),
+                        steps.get(i).getCalGen(), value, steps.get(i).getRemark()
+                };
+            }
+            if (!isGenMin) {
+                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + DispatchType + "输出\\2023年日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+            } else {
+                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + DispatchType + "输出\\2023年日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+            }
+        }
     }
 
     private static void getCalInputFromExcel(Object[][] data, CalculateInput input) {
@@ -250,5 +376,4 @@ public class BasinCalculateTest {
         }
         return stationDataMap;
     }
-
 }

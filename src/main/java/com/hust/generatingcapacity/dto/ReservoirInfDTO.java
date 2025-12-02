@@ -23,21 +23,21 @@ public class ReservoirInfDTO {
     //正常蓄水位（米）
     private Double normalWaterLevel;
     //校核洪水位（米）
-    private Double checkFloodLevel;
+    private Double checkFloodLevel = Double.MAX_VALUE;
     //最小库水位（米）
-    private Double minRegulateLevel;
+    private Double minRegulateLevel = 0.0;
     //水位库容曲线
     private List<CodeValueDTO> reservoirStorageLine;
 
-    public ReservoirInfDTO(Integer id,String reservoirName, Double totalCapacity, Double effectiveCapacity, Double deadCapacity, Double normalWaterLevel, Double checkFloodLevel, Double minRegulateLevel) {
+    public ReservoirInfDTO(Integer id, String reservoirName, Double totalCapacity, Double effectiveCapacity, Double deadCapacity, Double normalWaterLevel, Double checkFloodLevel, Double minRegulateLevel) {
         this.id = id;
         this.reservoirName = reservoirName;
         this.totalCapacity = totalCapacity;
         this.effectiveCapacity = effectiveCapacity;
         this.deadCapacity = deadCapacity;
         this.normalWaterLevel = normalWaterLevel;
-        this.checkFloodLevel = checkFloodLevel;
-        this.minRegulateLevel = minRegulateLevel;
+        this.checkFloodLevel = checkFloodLevel == null ? Double.MAX_VALUE : checkFloodLevel;
+        this.minRegulateLevel = minRegulateLevel == null ? 0.0 : minRegulateLevel;
     }
 
     public ReservoirInfDTO() {

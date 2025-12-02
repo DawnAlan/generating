@@ -33,8 +33,6 @@ public class CalDevelopmentProcess {
         DispatchType dispatchType = DispatchType.fromCode(calculateDevelopment.getDispatchType());
         Map<String, CalculateInput> calculateInputs = calculateDevelopment.getCalculateInputs();
         Map<String, CalculateCondition> calculateConditions = calculateDevelopment.getCalculateConditions();
-//        //分配输电断面容量
-//        distributeTransmissionCapacity(basinStationDatas);
         //设置CalculateVO各元素值
         for (Map.Entry<String, List<StationData>> entry : basinStationDatas.entrySet()) {
             List<StationData> stationDataList = entry.getValue();
@@ -68,52 +66,6 @@ public class CalDevelopmentProcess {
         }
         return map;
     }
-
-//    /**
-//     * 分配输电断面容量
-//     * @param basinStationDatas
-//     */
-//    private static void distributeTransmissionCapacity(Map<String, List<StationData>> basinStationDatas) {
-//        for (Map.Entry<String, List<StationData>> entry : basinStationDatas.entrySet()) {//对于每一个流域进行输电断面的审查
-//            List<StationData> stationDataList = entry.getValue();
-//            List<String> transmissionSections = stationDataList.stream()
-//                    .map(StationData::getTransmissionSection)
-//                    .distinct()
-//                    .filter(Objects::nonNull)
-//                    .filter(s -> !s.isEmpty())
-//                    .toList();
-//            for (String section : transmissionSections) {
-//                List<StationData> stationsInSection = stationDataList.stream()
-//                        .filter(stationData -> section.equals(stationData.getTransmissionSection()))
-//                        .toList();
-//                double totalCapacity = stationsInSection.stream()
-//                        .mapToDouble(StationData::getInstalledCapacity)
-//                        .sum();
-//                // 获取该输电断面的约束信息
-//                List<ConstraintData> constraints = stationsInSection.get(0).getConstraints();
-//                String param = constraints.stream()
-//                        // 先把每个约束里的 param 列表展开成一个大的 Stream<String>
-//                        .flatMap(c -> c.getParam().stream())
-//                        // 然后过滤出 param == ParamType.C 的表达式
-//                        .filter(exp -> {
-//                            String name = DisplayUtils.getMessageFromExp(exp, "param");
-//                            return ParamType.C.name().equals(name);
-//                        })
-//                        // 拿第一个匹配的
-//                        .findFirst()
-//                        .orElse(null);
-//                double transmissionCapacity = DisplayUtils.getMessageFromExp(param, "value") != null ?
-//                        Double.parseDouble(DisplayUtils.getMessageFromExp(param, "value")) : Double.MAX_VALUE;
-//                //这里可以设置每个电站在该输电断面的分配容量
-//                for (StationData stationData : stationsInSection) {
-//                    transmissionCapacity = Math.min(transmissionCapacity, totalCapacity);
-//                    double proportion = stationData.getInstalledCapacity() / totalCapacity;
-//                    //这里可以设置每个电站在该输电断面的分配比例
-//                    stationData.setTransmissionCapacity(proportion * transmissionCapacity);
-//                }
-//            }
-//        }
-//    }
 
     /**
      * 判断电站是否为区间径流电站
