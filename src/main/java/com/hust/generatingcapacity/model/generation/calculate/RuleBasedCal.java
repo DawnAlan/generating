@@ -308,16 +308,17 @@ public class RuleBasedCal {
             double qpMax = stationData.getNHQLines().stream()
                     .mapToDouble(line -> NHQData.getMaxQ(data.getHead(), line))
                     .sum();
+            double rate = CodeValue.linearInterpolation(data.getLevelBef(), stationData.getWaterConsumptionLine());
+            qpMax = qpMax == 0.0 ? stationData.getInstalledCapacity() * rate / 1e-3 / 3600 : qpMax;
             data.setQp(qpMax);
             data.setQo(qpMax);
-            double rate = CodeValue.linearInterpolation(data.getLevelBef(), stationData.getWaterConsumptionLine());
             double gen = qpMax * calParam.getPeriod() / rate / 1e3;
             data.setCalGen(gen);
             double levelAft = calculateLevelAft(data.getLevelBef(), qpMax, data.getInFlow(), calParam, stationData);
             data.setLevelAft(levelAft);
-            if (stationData.getTailLevelFlowLine().isEmpty()){
+            if (stationData.getTailLevelFlowLine().isEmpty()) {
                 data.setHeadAft(data.getHead());
-            }else {
+            } else {
                 double headAft = data.getLevelAft() - CodeValue.linearInterpolation(qpMax, stationData.getTailLevelFlowLine());
                 data.setHeadAft(headAft);
             }
@@ -349,6 +350,7 @@ public class RuleBasedCal {
                     .mapToDouble(line -> NHQData.getMaxQ(data.getHead(), line))
                     .sum();
             double rate = CodeValue.linearInterpolation(data.getLevelBef(), stationData.getWaterConsumptionLine());
+            qpMax = qpMax == 0.0 ? stationData.getInstalledCapacity() * rate / 1e-3 / 3600 : qpMax;
             ParamType type = paramValue.getParamType();
             double value = paramValue.getParamValue();
             switch (type) {

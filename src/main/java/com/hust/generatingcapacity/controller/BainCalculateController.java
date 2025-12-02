@@ -20,10 +20,10 @@ public class BainCalculateController {
     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
     @PostMapping("/addCalScheme")
-    public ResponseMessage<GenerationCalSchemeDTO> add(@Validated @RequestBody GenerationCalSchemeDTO dto) {
+    public ResponseMessage<String> add(@Validated @RequestBody GenerationCalSchemeDTO dto) {
         System.out.println(sdf.format(new Date()) + ":-----------已调用'basinCalculate'中计算某流域发电能力的功能----------");
         basinCalculateService.basinCalculate(dto);
-        return ResponseMessage.success(dto);
+        return ResponseMessage.success(sdf.format(new Date())+":-----------流域发电能力计算中----------");
     }
 
 }
