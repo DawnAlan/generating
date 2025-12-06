@@ -6,6 +6,7 @@ import com.hust.generatingcapacity.model.generation.type.ParamType;
 import com.hust.generatingcapacity.model.generation.type.PreConditionType;
 import com.hust.generatingcapacity.model.generation.vo.*;
 import com.hust.generatingcapacity.tools.TimeUtils;
+import org.springframework.beans.BeanUtils;
 
 import java.util.*;
 
@@ -14,29 +15,43 @@ public class RuleBasedCal {
     public CalculateStep run(CalculateVO calculateVO) {
         CalculateStep data = calculateVO.getCalStep();
         CalculateParam calParam = calculateVO.getCalParam();
-        StationData stationData = calculateVO.getStationData();
-        //将水库的特征信息作为常生效的约束条件
-        Map<ParamType, BoundPair> initialBoundPair = stationData.setInitialBoundPair();
-        if (initialBoundPair != null && !initialBoundPair.isEmpty()) {
-            for (Map.Entry<ParamType, BoundPair> entry : initialBoundPair.entrySet()) {
-                List<String> param = new LinkedList<>();
-                BoundPair boundPair = entry.getValue();
-                if (boundPair.getMinVal() > 0) {//有意义的约束才考量
-                    param.add(boundPair.toParamMinString(calParam.getPeriod()));
+        StationData base = calculateVO.getStationData();
+        //复制一份工作用的副本
+        StationData stationData = new StationData();
+        BeanUtils.copyProperties(base, stationData);
+        stationData.setConstraints(new ArrayList<>(base.getConstraints() == null
+                ? List.of()
+                : base.getConstraints()));
+
+        // 确保“水库特征约束”只加一次
+        boolean alreadyHasReservoirConstraint = stationData.getConstraints().stream()
+                .anyMatch(c -> "水库特征约束".equals(c.getConstraintType()));
+        if (!alreadyHasReservoirConstraint) {
+            Map<ParamType, BoundPair> initialBoundPair = stationData.setInitialBoundPair(); // 改成对 working 操作更安全
+            if (initialBoundPair != null && !initialBoundPair.isEmpty()) {
+                for (Map.Entry<ParamType, BoundPair> entry : initialBoundPair.entrySet()) {
+                    BoundPair boundPair = entry.getValue();
+                    if (boundPair.getMinVal() <= 0) {
+                        continue; // 没有意义的约束就跳过
+                    }
+                    List<String> param = new LinkedList<>();
+                    if (boundPair.getMinVal() > 0) {
+                        param.add(boundPair.toParamMinString(calParam.getPeriod()));
+                    }
+                    param.add(boundPair.toParamMaxString(calParam.getPeriod()));
+                    ConstraintData constraintData = new ConstraintData();
+                    constraintData.setConstraintType("水库特征约束");
+                    constraintData.setRigid(true);
+                    constraintData.setDescription("水库基本特征约束");
+                    constraintData.setCondition("dL >= 1"); // 恒真条件
+                    constraintData.setParam(param);
+                    stationData.getConstraints().add(constraintData);
                 }
-                param.add(boundPair.toParamMaxString(calParam.getPeriod()));
-                String condition = "dL >= 1"; // 恒真条件
-                ConstraintData constraintData = new ConstraintData();
-                constraintData.setConstraintType("水库特征约束");
-                constraintData.setRigid(true);
-                constraintData.setDescription("水库基本特征约束（水位区间等）");
-                constraintData.setCondition(condition);
-                constraintData.setParam(param);
-                stationData.getConstraints().add(constraintData);
             }
         }
+
         // ——配置——
-        int MAX_ATTEMPTS = 6;
+        int MAX_ATTEMPTS = 9;
         int CONFLICT_WINDOW = 3; // 最近N次用于冲突判断
         // ——状态——
         CalculateStep curr = data;
@@ -53,7 +68,9 @@ public class RuleBasedCal {
             if (violations.isEmpty()) {
                 StringBuilder remark = buildWarnMessage(history, lastViolation, null, CONFLICT_WINDOW);
                 List<ConstraintData> violationConstraints = violationConstraints(curr, next, calParam, stationData);
-                remark.append(" ;").append("共违反约束").append(violationConstraints.size()).append("条");
+                if (!remark.isEmpty()) {
+                    remark.append(" ;").append("共违反约束").append(violationConstraints.size()).append("条");
+                }
                 next.setRemark(remark.toString());
                 return next;
             }
@@ -67,7 +84,9 @@ public class RuleBasedCal {
             if (!shouldContinue(attempt, MAX_ATTEMPTS, lastViolation)) {
                 StringBuilder remark = buildWarnMessage(history, lastViolation, violations, CONFLICT_WINDOW);
                 List<ConstraintData> violationConstraints = violationConstraints(curr, next, calParam, stationData);
-                remark.append(" ;").append("共违反约束").append(violationConstraints.size()).append("条");
+                if (!remark.isEmpty()) {
+                    remark.append(" ;").append("共违反约束").append(violationConstraints.size()).append("条");
+                }
                 next.setRemark(remark.toString());
                 return next;
             }
@@ -77,7 +96,9 @@ public class RuleBasedCal {
         // ——兜底（理论到不了这儿）——
         StringBuilder remark = buildWarnMessage(history, lastViolation, Collections.emptyList(), CONFLICT_WINDOW);
         List<ConstraintData> violationConstraints = violationConstraints(curr, curr, calParam, stationData);
-        remark.append(" ;").append("共违反约束").append(violationConstraints.size()).append("条");
+        if (!remark.isEmpty()) {
+            remark.append(" ;").append("共违反约束").append(violationConstraints.size()).append("条");
+        }
         curr.setRemark(remark.toString());
         return curr;
     }
@@ -286,16 +307,17 @@ public class RuleBasedCal {
         } else {
             rate = stationData.getWaterConsumptionLine().get(0).getValue();
         }
+        double qpMax = stationData.getInstalledCapacity() * rate / 1e-3 / 3600;
         ParamType type = paramValue.getParamType();
         double value = paramValue.getParamValue();
         switch (type) {
             case Qo -> {
                 double qo = value;
-                double qp = value;
+                double qp = Math.min(qpMax,value);
                 applyResult(data, qp, qo, rate, calParam, stationData);
             }
             case Qp -> {
-                double qp = value;
+                double qp = Math.min(qpMax,value);
                 double qo = Math.max(data.getQo(), qp);
                 applyResult(data, qp, qo, rate, calParam, stationData);
             }
@@ -303,13 +325,15 @@ public class RuleBasedCal {
                 double H_aft = data.getLevelBef() + value;
                 data.setLevelAft(H_aft);
                 double qo_cal = calculateQo(H_aft, data, calParam, stationData);
-                applyResult(data, qo_cal, qo_cal, rate, calParam, stationData);
+                double qp = Math.min(qpMax,qo_cal);
+                applyResult(data, qp, qo_cal, rate, calParam, stationData);
             }
             case H -> {
                 double H_aft = value;
                 data.setLevelAft(H_aft);
                 double qo_cal = calculateQo(H_aft, data, calParam, stationData);
-                applyResult(data, qo_cal, qo_cal, rate, calParam, stationData);
+                double qp = Math.min(qpMax,qo_cal);
+                applyResult(data, qp, qo_cal, rate, calParam, stationData);
             }
             case P -> {
                 double gen = value;

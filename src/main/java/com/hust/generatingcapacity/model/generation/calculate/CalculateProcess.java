@@ -93,7 +93,7 @@ public class CalculateProcess {
             double transmissionCapacity = DisplayUtils.getMessageFromExp(param, "value") != null ?
                     Double.parseDouble(DisplayUtils.getMessageFromExp(param, "value")) : Double.MAX_VALUE;
             //这里可以设置每个电站在该输电断面的分配容量
-            if (totalGenCapacity >= transmissionCapacity) {
+            if (totalGenCapacity > transmissionCapacity) {
                 needDistribute = true;
                 System.out.println("流域 " + basin + " 中输电断面 " + section + " 发电能力总和 " + totalGenCapacity + " MW 超过输电断面容量 " + transmissionCapacity + " MW，按装机容量比例分配输电断面容量。");
                 for (StationData stationData : stationsInSection) {

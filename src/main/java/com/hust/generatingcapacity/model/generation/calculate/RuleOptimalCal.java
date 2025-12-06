@@ -43,8 +43,9 @@ public class RuleOptimalCal {
                 return step.getLeft();
             }
             // 2. 需要修正：按优先级逐步放宽约束，直到不需要修正或轮次耗尽
-            final int typeCount = ParamType.values().length;
-            final int maxRounds = typeCount * 2;  // 软 + 硬 两轮
+            int rigidParam = new ConstraintData().numParamOfRigid(condition, stationData.getConstraints());
+            int softParam = new ConstraintData().numParamOfSoft(condition, stationData.getConstraints());
+            int maxRounds = rigidParam + softParam;  // 软 + 硬 两轮
             StringBuilder remarkBuilder = new StringBuilder();// 记录放宽/违反约束
             for (int round = 1; round <= maxRounds; ) {
                 //首先尝试放宽某个参数的约束
@@ -57,15 +58,18 @@ public class RuleOptimalCal {
                 }
                 ParamType relaxType = varPriorityMap.get(relaxedVar.getKey());
                 ConstraintData firestViolatedCon = ConstraintData.getFirstViolatedConstraint(stationData.getConstraints(), condition, relaxType, relaxedVar.getValue());
+                if (firestViolatedCon == null) {//约束中没有这个参数
+                    return new RuleBasedCal().run(calculateVO);
+                }
                 Either<CalculateStep, ExpressionsBasedModel> nextStep = calculate(data, calParam, stationData, initialBound);
                 if (nextStep.isLeft()) {
                     //记录放宽信息
-                    if (firestViolatedCon != null) {
-                        remarkBuilder.append("约束：").append(firestViolatedCon.getDescription()).append(" 适当放宽，")
-                                .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(initialBound.get(relaxType).toString()).append(" ;");
-                    }
+                    remarkBuilder.append("约束：").append(firestViolatedCon.getDescription()).append(" 适当放宽，")
+                            .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(initialBound.get(relaxType).toString()).append(" ;");
                     List<ConstraintData> violationConstraints = violationConstraints(nextStep.getLeft(), calParam, stationData);
-                    remarkBuilder.append("共违反约束").append(violationConstraints.size()).append("条");
+                    if (!remarkBuilder.isEmpty()) {
+                        remarkBuilder.append("共违反约束").append(violationConstraints.size()).append("条");
+                    }
                     nextStep.getLeft().setRemark(remarkBuilder.toString());
                     return nextStep.getLeft();
                 } else {//开始放弃某些约束
@@ -73,12 +77,12 @@ public class RuleOptimalCal {
                     Either<CalculateStep, ExpressionsBasedModel> reviseStep = calculate(data, calParam, stationData, reviseBound);
                     if (reviseStep.isLeft()) {
                         //记录放弃约束信息
-                        if (firestViolatedCon != null) {
-                            remarkBuilder.append("为保障发电计算模型有解，该项约束：").append(firestViolatedCon.getDescription()).append("被放弃，")
-                                    .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(reviseBound.get(relaxType).toString()).append(" ;");
-                        }
+                        remarkBuilder.append("为保障发电计算模型有解，该项约束：").append(firestViolatedCon.getDescription()).append("被放弃，")
+                                .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(reviseBound.get(relaxType).toString()).append(" ;");
                         List<ConstraintData> violationConstraints = violationConstraints(reviseStep.getLeft(), calParam, stationData);
-                        remarkBuilder.append("共违反约束").append(violationConstraints.size()).append("条");
+                        if (!remarkBuilder.isEmpty()) {
+                            remarkBuilder.append("共违反约束").append(violationConstraints.size()).append("条");
+                        }
                         reviseStep.getLeft().setRemark(remarkBuilder.toString());
                         return reviseStep.getLeft();
                     } else {
@@ -273,7 +277,7 @@ public class RuleOptimalCal {
 
 
         // 求解
-        model.options.time_abort = 60000;    // 运行 1 分钟后强制停止
+        model.options.time_abort = 30000;    // 运行 30s 后强制停止
         model.options.iterations_abort = 1000000; // 达到最大迭代数后停止
         Optimisation.Result rs = model.maximise();
 

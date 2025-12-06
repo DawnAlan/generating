@@ -62,7 +62,7 @@ public class BasinCalculateService implements IBasinCalculateService {
         Date end = generationCalSchemeDTO.getEndDate();
         int schedulingL = generationCalSchemeDTO.getSchemeL();
         String period = generationCalSchemeDTO.getPeriod();
-        boolean isGenMin = false; //是否计算最小发电能力
+        boolean isGenMin = true; //是否计算最小发电能力
         //获取各流域电站数据
         Map<String, List<StationData>> basinStationDataMap = getStationDataMap(basin);
         Map<String, StationData> stationDataMap = new LinkedHashMap<>();
@@ -76,7 +76,7 @@ public class BasinCalculateService implements IBasinCalculateService {
 
         //计算单一方案
         int number = TimeUtils.getDateDuration(start, end, period);
-        for (int genMin = 0; genMin <= 1; genMin++) {
+        for (int genMin = 0; genMin < 1; genMin++) {
 //            Map<String, List<CalculateStep>> result = new LinkedHashMap<>();
             if (genMin > 0) {
                 isGenMin = true;
