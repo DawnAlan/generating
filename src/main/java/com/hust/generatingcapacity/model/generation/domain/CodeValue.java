@@ -67,14 +67,14 @@ public class CodeValue {
             CodeValue cv1 = value1.get(0);
             cv1.setCode(value2.get(0).getCode());
             for (int i = 1; i < value2.size(); i++) {
-                value1.set(i, new CodeValue(value2.get(i).getCode(), value1.get(i).getValue()));
+                value1.add(i, new CodeValue(value2.get(i).getCode(), value1.get(0).getValue()));
             }
         }
         if (value2.size() == 1 && value1.size() > 1) {
             CodeValue cv2 = value2.get(0);
             cv2.setCode(value1.get(0).getCode());
             for (int i = 1; i < value1.size(); i++) {
-                value2.set(i, new CodeValue(value1.get(i).getCode(), value2.get(i).getValue()));
+                value2.add(i, new CodeValue(value1.get(i).getCode(), value2.get(0).getValue()));
             }
         }
         if (value1.size() > 1 && value2.size() > 1) {
@@ -108,6 +108,9 @@ public class CodeValue {
     }
 
     public static double linearInterpolation(double targetCode, List<CodeValue> values) {
+        if (values.isEmpty()){
+            return 0.0;
+        }
         //先对其进行排序
         values.sort(Comparator.comparing(CodeValue::getCode));
         // 二分查找

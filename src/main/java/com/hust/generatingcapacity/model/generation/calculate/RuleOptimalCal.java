@@ -27,7 +27,7 @@ public class RuleOptimalCal {
     //变量优先级排序（与影响变量的参数优先级一致）
     static Map<Variable, ParamType> varPriorityMap = new HashMap<>();
 
-    public static CalculateStep run(CalculateVO calculateVO) {
+    public CalculateStep run(CalculateVO calculateVO) {
         CalculateStep data = calculateVO.getCalStep();
         CalculateParam calParam = calculateVO.getCalParam();
         StationData stationData = calculateVO.getStationData();
@@ -53,15 +53,19 @@ public class RuleOptimalCal {
                 try {
                     relaxedVar = getRelaxedParamBound(data, infeasibleModel, stationData, initialBound);// 放宽约束主函数
                 } catch (Exception e) {//找不到需要放宽的参数则丢给规程边界模型
-                    return RuleBasedCal.run(calculateVO);
+                    return new RuleBasedCal().run(calculateVO);
                 }
                 ParamType relaxType = varPriorityMap.get(relaxedVar.getKey());
                 ConstraintData firestViolatedCon = ConstraintData.getFirstViolatedConstraint(stationData.getConstraints(), condition, relaxType, relaxedVar.getValue());
                 Either<CalculateStep, ExpressionsBasedModel> nextStep = calculate(data, calParam, stationData, initialBound);
                 if (nextStep.isLeft()) {
                     //记录放宽信息
-                    remarkBuilder.append("约束：").append(firestViolatedCon == null ? "" : firestViolatedCon.getDescription()).append(" 适当放宽，")
-                            .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(initialBound.get(relaxType).toString()).append("\n");
+                    if (firestViolatedCon != null) {
+                        remarkBuilder.append("约束：").append(firestViolatedCon.getDescription()).append(" 适当放宽，")
+                                .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(initialBound.get(relaxType).toString()).append(" ;");
+                    }
+                    List<ConstraintData> violationConstraints = violationConstraints(nextStep.getLeft(), calParam, stationData);
+                    remarkBuilder.append("共违反约束").append(violationConstraints.size()).append("条");
                     nextStep.getLeft().setRemark(remarkBuilder.toString());
                     return nextStep.getLeft();
                 } else {//开始放弃某些约束
@@ -69,8 +73,12 @@ public class RuleOptimalCal {
                     Either<CalculateStep, ExpressionsBasedModel> reviseStep = calculate(data, calParam, stationData, reviseBound);
                     if (reviseStep.isLeft()) {
                         //记录放弃约束信息
-                        remarkBuilder.append("为保障发电计算模型有解，该项约束：").append(firestViolatedCon == null ? "" : firestViolatedCon.getDescription()).append("被放弃，")
-                                .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(reviseBound.get(relaxType).toString()).append("\n");
+                        if (firestViolatedCon != null) {
+                            remarkBuilder.append("为保障发电计算模型有解，该项约束：").append(firestViolatedCon.getDescription()).append("被放弃，")
+                                    .append("参数：").append(relaxType.toString()).append("取值区间被调整为：").append(reviseBound.get(relaxType).toString()).append(" ;");
+                        }
+                        List<ConstraintData> violationConstraints = violationConstraints(reviseStep.getLeft(), calParam, stationData);
+                        remarkBuilder.append("共违反约束").append(violationConstraints.size()).append("条");
                         reviseStep.getLeft().setRemark(remarkBuilder.toString());
                         return reviseStep.getLeft();
                     } else {
@@ -82,7 +90,7 @@ public class RuleOptimalCal {
             e.printStackTrace();
         }
         // 3. 全部放宽轮次耗尽，仍然需要修正/内部有报错信息 → 采用规程边界模型
-        return RuleBasedCal.run(calculateVO);
+        return new RuleBasedCal().run(calculateVO);
     }
 
     /**
@@ -108,8 +116,8 @@ public class RuleOptimalCal {
         } else {
             dHCound = CodeValue.codeDifference(Vb / 1e6, (Vb + Qin * t) / 1e6, stationData.getReservoirStorageLine());
         }
-        double H_min = Math.min(cound.get(ParamType.H).getMinVal(), Math.round(Hb)) - Math.min(dHCound, 10.0);
-        double H_max = Math.max(cound.get(ParamType.H).getMaxVal(), Math.round(Hb)) + Math.min(dHCound, 10.0);
+        double H_min = Math.min(cound.get(ParamType.H).getMinVal(), Math.round(Hb)) - Math.min(dHCound, 3.0);
+        double H_max = Math.max(cound.get(ParamType.H).getMaxVal(), Math.round(Hb)) + Math.min(dHCound, 3.0);
         //获取特征曲线
         List<CodeValue> reservoirStorageLine = stationData.getReservoirStorageLine()
                 .stream()
@@ -126,7 +134,8 @@ public class RuleOptimalCal {
         //重新设置流量的上边界
         double dV_max = CodeValue.difference(Hb, H_min, reservoirStorageLine) * 1e6;
         double Q_max = Math.min(cound.get(ParamType.Qo).getMaxVal(), (Qin * t - dV_max) / t);
-        cound.get(ParamType.Qp).setMaxVal(Q_max);
+        double Qp_max = Math.min(stationData.getInstalledCapacity() * CodeValue.linearInterpolation(H_max, waterConsumptionLine) / 1e-3 / 3600, cound.get(ParamType.Qp).getMaxVal());
+        cound.get(ParamType.Qp).setMaxVal(Qp_max);
         cound.get(ParamType.Qo).setMaxVal(Q_max);
 
         // 计算变量边界
@@ -195,9 +204,31 @@ public class RuleOptimalCal {
                 .set(Qo, t);
         constr5.level(Qin * t); // 约束: dV + Qo*t = Qin*t
 
+        // Big-M & 容差
+        double M_spill = Math.max(0.0, Q_max);        // 能覆盖“最大弃水”
+        double M_q = Math.max(Qp_max, 1.0);        // 至少不小于 Qp_max
+        double tau = Math.max(1e-6 * Qp_max, 1e-3);
+
+        // 二进制：是否满发
+        Variable z_full = addVar(model, "z_full", 0.0, 1.0).integer(true);
+
+        // (A) 非满发不许弃水：Qo - Qp ≤ M_spill * z_full
+        Expression spill_only_if_full = model.addExpression("spill_only_if_full")
+                .set(Qo, 1.0)
+                .set(Qp, -1.0)
+                .set(z_full, -M_spill);  // Qo - Qp - M_spill*z_full ≤ 0
+        spill_only_if_full.upper(0.0);
+
+        // (B) 满发判定：Qp ≥ Qp_max − τ − M_q * (1 − z_full)
+        // 等价：Qp - M_q*z_full ≥ Qp_max - τ - M_q
+        Expression full_definition = model.addExpression("full_definition")
+                .set(Qp, 1.0)
+                .set(z_full, -M_q);
+        full_definition.lower(Qp_max - tau - M_q);
+
         // 弃水软惩罚
-        double eps = calParam.isGenMin() ? 0.6 : 0.01; // 计算最小发电量时，弃水约束应增大权重
-        Variable S_spill = addVar(model, "S_spill", 0.0, cound.get(ParamType.Qo).getMaxVal());
+        double eps = calParam.isGenMin() ? 0.8 : 0.01; // 计算最小发电量时，弃水约束应增大权重
+        Variable S_spill = addVar(model, "S_spill", 0.0, Math.max(0, cound.get(ParamType.Qo).getMaxVal() - cound.get(ParamType.Qp).getMaxVal()));
         Expression spill_def1 = model.addExpression("spill_ge_Qo_minus_Qp")
                 .set(S_spill, 1.0).set(Qo, -1.0).set(Qp, 1.0);
         spill_def1.lower(0.0); // S_spill - Qo + Qp >= 0  -> S_spill >= Qo - Qp
@@ -206,7 +237,7 @@ public class RuleOptimalCal {
         // 发电计算
         Variable Lc;
         double L;
-        if (calParam.isConsiderH()) {//有细致的耗水率曲线
+        if (calParam.isConsiderH() && !calParam.isGenMin()) {//有细致的耗水率曲线且是计算最大发电
             // 耗水率
             Lc = addVar(model, "Lc", CodeValue.getMinValue(waterConsumptionLine) * 1e3, CodeValue.getMaxValue(waterConsumptionLine) * 1e3);
             CodeValue.sampleToGrid(reservoirStorageLine, waterConsumptionLine);// 重采样到同一网格
@@ -219,7 +250,7 @@ public class RuleOptimalCal {
             // McCormick：Vp = Gen * L耗
             addMcCormickBilinear(model, Vp, Gen, Lc, genL, genU, L_min, L_max);
         } else {
-            L = waterConsumptionLine.get(0).getValue() * 1e3;
+            L = CodeValue.linearInterpolation(Hb, waterConsumptionLine) * 1e3;
             double[] Hgrid = reservoirStorageLine.stream().mapToDouble(CodeValue::getCode).toArray();
             PiecewiseLambdas lam = addPiecewiseHa(model, Ha, Hgrid); // 构建 Ha 分段线性化骨架
             double[] Vgrid = reservoirStorageLine.stream().mapToDouble(cv -> cv.getValue() * 1e6).toArray();
@@ -234,11 +265,12 @@ public class RuleOptimalCal {
         // === 目标：最大化 Gen ===
         if (calParam.isGenMin()) {
             Gen.weight(-1.0);
+            // 目标：轻微惩罚弃水
+            S_spill.weight(-eps);
         } else {
             Gen.weight(1.0);
         }
-        // 目标：轻微惩罚弃水
-        S_spill.weight(-eps);
+
 
         // 求解
         model.options.time_abort = 60000;    // 运行 1 分钟后强制停止
@@ -607,5 +639,39 @@ public class RuleOptimalCal {
         // 只在上界是“有限且合理”的时候设置；否则不设上界更安全
         if (hi != null && Double.isFinite(hi) && hi < 1e300) v.upper(hi);
         return v;
+    }
+
+    /**
+     * 获取此次发电计算方案违反的约束
+     *
+     * @param data
+     * @param calParam
+     * @param stationData
+     * @return
+     */
+    private static List<ConstraintData> violationConstraints(CalculateStep data, CalculateParam calParam, StationData stationData) {
+        //违反的约束数量
+        List<ConstraintData> violationConstraints = new ArrayList<>();
+        //约束条件
+        Integer T = TimeUtils.getSpecificDate(data.getTime()).get("月");
+        double H = data.getLevelBef();
+        double Qin = data.getInFlow();
+        Map<String, Object> conditionEnv = new ConstraintEnvBuilder().conditionBuild(T, H, calParam.getSchedulingL(), calParam.getPeriod(), Qin);
+        //约束参数
+        double H_aft = data.getLevelAft();
+        double dH = H_aft - H;
+        Map<String, Object> paramEnv = new ConstraintEnvBuilder().paramBuild(H_aft, dH, data.getQp(), data.getQo(), 0, data.getCalGen());
+        //检查约束
+        List<ConstraintData> constraints = stationData.getConstraints();
+        for (ConstraintData constraint : constraints) {
+            if (constraint.isConditionActive(constraint.getCondition(), conditionEnv)) {
+                List<String> paramList = constraint.getParam();
+                Map<ParamType, Double> param = constraint.getParamConstraintValue(paramList, paramEnv, conditionEnv);
+                if (param != null && !param.isEmpty()) {
+                    violationConstraints.add(constraint);
+                }
+            }
+        }
+        return violationConstraints;
     }
 }

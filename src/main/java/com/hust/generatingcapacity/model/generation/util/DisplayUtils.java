@@ -24,7 +24,15 @@ public class DisplayUtils {
     }
 
     public static String getMessageFromExp(String exp, String type) {
-        Pattern PATTERN = Pattern.compile("^(?<param>[A-Za-z][A-Za-z0-9]*)\\s*(?<op>>=|<=|>|<|==|\\+|-|\\*|/)\\s*(?<value>-?\\d+(\\.\\d+)?|∞|Infinity|-Infinity|NaN|[A-Za-z][A-Za-z0-9]*)$");
+        Pattern PATTERN = Pattern.compile(
+                "^(?<param>[A-Za-z][A-Za-z0-9]*)" +
+                        "\\s*(?<op>>=|<=|>|<|==|\\+|-|\\*|/)" +
+                        "\\s*(?<value>" +
+                        "-?\\d+(\\.\\d+)?([eE][+\\-]?\\d+)?" +  // ✔ 支持科学计数法
+                        "|∞|Infinity|-Infinity|NaN" +
+                        "|[A-Za-z][A-Za-z0-9]*" +
+                        ")$"
+        );
         Matcher m = PATTERN.matcher(exp);
         String param;
         String op;

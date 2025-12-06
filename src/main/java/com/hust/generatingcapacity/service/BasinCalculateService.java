@@ -41,6 +41,8 @@ public class BasinCalculateService implements IBasinCalculateService {
     @Autowired
     private GenerationCalSchemeRepository generationCalSchemeRepository;
     @Autowired
+    private GenerationCalSchemeService generationCalSchemeService;
+    @Autowired
     private GenerationCalStationOutRepository generationCalStationOutRepository;
     @Autowired
     private GenerationCalBasinOutRepository generationCalBasinOutRepository;
@@ -71,10 +73,11 @@ public class BasinCalculateService implements IBasinCalculateService {
         });
         //从表格中获取数据
         Map<String, Object[][]> dataMap = setdataMap(stationDataMap);
-        Map<String, List<CalculateStep>> result = new HashMap<>();
+
         //计算单一方案
         int number = TimeUtils.getDateDuration(start, end, period);
         for (int genMin = 0; genMin <= 1; genMin++) {
+//            Map<String, List<CalculateStep>> result = new LinkedHashMap<>();
             if (genMin > 0) {
                 isGenMin = true;
             }
@@ -87,7 +90,7 @@ public class BasinCalculateService implements IBasinCalculateService {
                 CalculateDevelopment calculateDevelopment = new CalculateDevelopment();
                 //获取各电站输入信息
                 Map<String, CalculateInput> calculateInputs = new LinkedHashMap<>();
-                Map<String,CalculateCondition> calculateConditions = new LinkedHashMap<>();
+                Map<String, CalculateCondition> calculateConditions = new LinkedHashMap<>();
                 for (String stationName : stationDataMap.keySet()) {
                     //获取单个电站输入（待完善）
                     CalculateInput calculateInput = new CalculateInput(stationName, startDate, period);
@@ -104,7 +107,7 @@ public class BasinCalculateService implements IBasinCalculateService {
                     calculateInput.checkForecast(schedulingL);
                     calculateInputs.put(stationName, calculateInput);
                     //获取电站约束（待完善）预设条件模型目前按照末水位来计算
-                    if (dispatchType.equals(DispatchType.PRE_CONDITION.getDesc())){
+                    if (dispatchType.equals(DispatchType.PRE_CONDITION.getDesc())) {
                         CalculateCondition calculateCondition = new CalculateCondition();
                         calculateCondition.setStation(stationName);
                         calculateCondition.setPreCondition(PreConditionType.H_after);
@@ -128,18 +131,49 @@ public class BasinCalculateService implements IBasinCalculateService {
                 Map<String, CalculateVO> calculateVO = CalDevelopmentProcess.setCalculateVO(calculateDevelopment, basinStationDataMap, isGenMin);
                 // 当前时段所有电站的计算结果
                 Map<String, List<CalculateStep>> current = CalculateProcess.schedulingLStepAllStationCalculate(calculateVO, basin, schedulingL);
-                // 累积到 result
-                for (Map.Entry<String, List<CalculateStep>> entry : current.entrySet()) {
-                    String station = entry.getKey();
-                    List<CalculateStep> steps = entry.getValue();
-                    result.computeIfAbsent(station, k -> new ArrayList<>()).addAll(steps);
-                    System.out.println(station + " 第" + i + " 时段计算完成………………");
+                //记录至数据库
+                recordOneResults(scheme, basin, current, isGenMin, dispatchType, period);
+//                // 累积到 result
+//                for (Map.Entry<String, List<CalculateStep>> entry : current.entrySet()) {
+//                    String station = entry.getKey();
+//                    List<CalculateStep> steps = entry.getValue();
+//                    result.computeIfAbsent(station, k -> new ArrayList<>()).addAll(steps);
+//                    System.out.println(station + " 第" + i + " 时段计算完成………………");
+//                }
+            }
+            generationCalSchemeRepository.save(scheme);
+            //记录至表格
+            GenerationCalSchemeDTO dto = generationCalSchemeService.getGenerationCalSchemeDTO(generationCalSchemeDTO.getSchemeName());
+            List<GenerationCalBasinOutDTO> generationCalBasinOutDTOS = dto.getGenerationCalBasinOuts();
+            List<GenerationCalStationOutDTO> generationCalStationOutDTOS = new ArrayList<>();
+            for (GenerationCalBasinOutDTO generationCalBasinOutDTO : generationCalBasinOutDTOS) {
+                generationCalStationOutDTOS.addAll(generationCalBasinOutDTO.getGenerationCalStationOuts());
+            }
+            int genStatus;
+            if (!isGenMin){
+                genStatus = 1;
+            }else {
+                if (generationCalSchemeDTO.getDispatchType().equals(DispatchType.PRE_CONDITION.getDesc())) {
+                    genStatus = 2;
+                } else {
+                    genStatus = 0;
                 }
             }
-            //记录至表格
-            recordExcelResults(stationDataMap.keySet(), dataMap, result, isGenMin, generationCalSchemeDTO);
+            Map<String, List<GenerationCalStationOutDTO>> result =
+                    generationCalStationOutDTOS.stream()
+                            .collect(Collectors.groupingBy(
+                                    GenerationCalStationOutDTO::getStation,   // 按 station 分组
+                                    Collectors.collectingAndThen(
+                                            Collectors.toList(),
+                                            list -> list.stream()
+                                                    .filter(generationCalStationOutDTO -> Objects.equals(generationCalStationOutDTO.getGenStatus(), genStatus))
+                                                    .sorted(Comparator.comparing(GenerationCalStationOutDTO::getTime))
+                                                    .toList()
+                                    )
+                            ));
+            recordDTOExcelResults(stationDataMap.keySet(), dataMap, result, isGenMin, generationCalSchemeDTO);
             //记录至数据库
-            recordResults(scheme, basin, result, isGenMin, dispatchType, period);
+//            recordResults(scheme, basin, result, isGenMin, dispatchType, period);
 //            generationCalBasinOutDTOs.addAll(basinOutDTOList);
         }
 //        generationCalSchemeDTO.setGenerationCalBasinOuts(generationCalBasinOutDTOs);
@@ -166,6 +200,61 @@ public class BasinCalculateService implements IBasinCalculateService {
             dataMap.put(stationName, data);
         }
         return dataMap;
+    }
+
+    /**
+     * 记录结果到数据库
+     *
+     * @param scheme
+     * @param basin
+     * @param result
+     * @param isGenMin
+     * @param dispatchType
+     * @param period
+     */
+    private void recordOneResults(GenerationCalScheme scheme, String basin, Map<String, List<CalculateStep>> result, boolean isGenMin, String dispatchType, String period) {
+
+        List<GenerationCalBasinOut> generationCalBasinOuts = Optional.ofNullable(scheme.getGenerationCalBasinOuts())
+                .orElse(new ArrayList<>());
+        //当前一个一个流域进行计算
+        //各时段结果铺平
+        List<CalculateStep> allSteps = result.values().stream()
+                .flatMap(List::stream)
+                .toList();
+        Map<Date, Map<String, CalculateStep>> byTimeAndStation =
+                allSteps.stream()
+                        .collect(Collectors.groupingBy(
+                                cs -> TimeUtils.cleanDate(cs.getTime(), period),
+                                TreeMap::new,
+                                Collectors.toMap(
+                                        CalculateStep::getStation,
+                                        cs -> cs,
+                                        (a, b) -> a
+                                )
+                        ));
+        //按时段进行保存
+        for (Date date : byTimeAndStation.keySet()) {
+            GenerationCalBasinOut basinOut = new GenerationCalBasinOut();
+            basinOut.setBasin(basin);
+            basinOut.setTime(date);
+            basinOut.setGenerationCalScheme(scheme);
+            //流域内电站保存
+            Map<String, CalculateStep> stationStepMap = byTimeAndStation.get(date);
+            if (stationStepMap == null || stationStepMap.isEmpty()) {//防守
+                continue;
+            }
+            List<GenerationCalStationOut> stationOuts = new ArrayList<>();
+            for (CalculateStep step : stationStepMap.values()) {
+                GenerationCalStationOut generationCalStationOut = new GenerationCalStationOut(step, isGenMin, DispatchType.fromCode(dispatchType));
+                generationCalStationOut.setGenerationCalBasinOut(basinOut);
+                stationOuts.add(generationCalStationOut);
+            }
+            basinOut.setGenerationCalStationOuts(stationOuts);
+            generationCalBasinOuts.add(basinOut);
+        }
+        scheme.setGenerationCalBasinOuts(generationCalBasinOuts);
+
+
     }
 
     /**
@@ -218,22 +307,7 @@ public class BasinCalculateService implements IBasinCalculateService {
         }
         scheme.setGenerationCalBasinOuts(generationCalBasinOuts);
         generationCalSchemeRepository.save(scheme);
-//        //返回DTO
-//        List<GenerationCalBasinOutDTO> generationCalBasinOutDTOs = new ArrayList<>();
-//        for (GenerationCalBasinOut basinOut : generationCalBasinOuts) {
-//            List<GenerationCalStationOut> stationOuts = basinOut.getGenerationCalStationOuts();
-//            List<GenerationCalStationOutDTO> stationOutDTOs = new ArrayList<>();
-//            for (GenerationCalStationOut stationOut : stationOuts) {
-//                GenerationCalStationOutDTO stationOutDTO = new GenerationCalStationOutDTO();
-//                BeanUtils.copyProperties(stationOut, stationOutDTO);
-//                stationOutDTOs.add(stationOutDTO);
-//            }
-//            GenerationCalBasinOutDTO basinOutDTO = new GenerationCalBasinOutDTO();
-//            BeanUtils.copyProperties(basinOut, basinOutDTO);
-//            basinOutDTO.setGenerationCalStationOuts(stationOutDTOs);
-//            generationCalBasinOutDTOs.add(basinOutDTO);
-//        }
-//        return generationCalBasinOutDTOs;
+
     }
 
     /**
@@ -245,6 +319,10 @@ public class BasinCalculateService implements IBasinCalculateService {
      * @param isGenMin
      */
     private static void recordExcelResults(Set<String> stationDataMapKeySet, Map<String, Object[][]> dataMap, Map<String, List<CalculateStep>> result, boolean isGenMin, GenerationCalSchemeDTO dto) {
+        List<String> basins = List.of("雅砻江", "岷江", "大渡河", "金沙江", "青衣江", "嘉陵江");
+        String regex = "-(" + String.join("|", basins) + ")$";
+        String scheme = dto.getSchemeName().replaceAll(regex, "");
+
         String period = dto.getPeriod();
         String basin = dto.getBasin();
         String DispatchType = dto.getDispatchType();
@@ -272,14 +350,53 @@ public class BasinCalculateService implements IBasinCalculateService {
                 };
             }
             if (!isGenMin) {
-                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "输出\\" + dto.getSchemeName() + "日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "\\" + scheme + "日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
             } else {
-                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "输出\\" + dto.getSchemeName() + "日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "\\" + scheme + "日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
             }
         }
     }
 
-    private static double getHAfterFromExcel(Object[][] data, Date date,String period) {
+    private static void recordDTOExcelResults(Set<String> stationDataMapKeySet, Map<String, Object[][]> dataMap, Map<String, List<GenerationCalStationOutDTO>> result, boolean isGenMin, GenerationCalSchemeDTO dto) {
+        List<String> basins = List.of("雅砻江", "岷江", "大渡河", "金沙江", "青衣江", "嘉陵江");
+        String regex = "-(" + String.join("|", basins) + ")$";
+        String scheme = dto.getSchemeName().replaceAll(regex, "");
+
+        String period = dto.getPeriod();
+        String basin = dto.getBasin();
+        String DispatchType = dto.getDispatchType();
+        int schedulingL = dto.getSchemeL();
+        for (String station : stationDataMapKeySet) {
+            List<GenerationCalStationOutDTO> steps = result.get(station);
+            if (steps == null || steps.isEmpty()) {
+                break;
+            }
+            Object[][] res = new Object[steps.size() + 1][];
+            res[0] = new Object[]{"时间", "是否修正", "入库径流", "开始水位", "结束水位", "发电流量", "出库流量", "规程计算结果", "历史真实发电（MW*H）", "警告信息"};
+            for (int i = 0; i < steps.size(); i++) {
+                int finalI = i;
+                Object value = Arrays.stream(dataMap.get(station))
+                        .skip(1)
+                        .filter(d -> TimeUtils.dateCompare((Date) ((Object[]) d)[0], steps.get(finalI).getTime(), period))
+                        .findFirst()   // 返回 Optional<Object>
+                        .map(d -> ((Object[]) d)[5])  // 取下标
+                        .orElse(null); // 如果没找到，返回 null
+                res[i + 1] = new Object[]{
+                        steps.get(i).getTime(), " ", steps.get(i).getInFlow(),
+                        steps.get(i).getLevelBef(), steps.get(i).getLevelAft(),
+                        steps.get(i).getQp(), steps.get(i).getQo(),
+                        steps.get(i).getCalGen(), value, steps.get(i).getRemark()
+                };
+            }
+            if (!isGenMin) {
+                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "\\" + scheme + "日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+            } else {
+                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "\\" + scheme + "日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+            }
+        }
+    }
+
+    private static double getHAfterFromExcel(Object[][] data, Date date, String period) {
         if (data.length == 0) {
             // 完全找不到有水位的记录，这里你要自己定策略：用默认值 / 抛异常 / 记录 remark
             return 0;

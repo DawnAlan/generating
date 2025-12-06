@@ -11,7 +11,7 @@ import java.util.List;
 
 public class PreConditionCal {
 
-    public static CalculateStep run(CalculateVO calculateVO) {
+    public CalculateStep run(CalculateVO calculateVO) {
         PreConditionType preConditionType = calculateVO.getCalCondition().getPreCondition();
         return switch (preConditionType) {
             case H_after -> calHAfter(calculateVO);
@@ -85,7 +85,7 @@ public class PreConditionCal {
         List<CodeValue> waterConsumptionLine = stationData.getWaterConsumptionLine();
         //计算过程
         double dH = calCondition.getPreValue() - data.getLevelBef();
-        int dL = TimeUtils.getDateDuration(input.getStart(), data.getTime(), input.getPeriod());
+        int dL = TimeUtils.getDateDuration(input.getStart(), data.getTime(), input.getPeriod()) + 1;
         dH = dH * dL / calParam.getSchedulingL();
         double levelAfter = data.getLevelBef() + dH;
         double storageBef = CodeValue.linearInterpolation(data.getLevelBef(), reservoirStorageLine);

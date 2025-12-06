@@ -39,10 +39,24 @@ public class ConstraintData {
             return false;
         }
         if (env == null || env.isEmpty()) {
-            throw new IllegalArgumentException("请检查 " + description + " 判断条件是否生效的输入！");
+            throw new IllegalArgumentException("判断条件缺少必要参数：" + condition);
         }
-//        System.out.println(condition);
-        return (Boolean) AviatorEvaluator.execute(condition, env);
+
+        // 1. 按 && 拆分
+        String[] andBlocks = condition.split("&&");
+
+        for (String block : andBlocks) {
+            String exp = block.trim();
+            if (exp.isEmpty()) continue;
+
+            Boolean blockResult = (Boolean) AviatorEvaluator.execute(exp, env);
+            if (!blockResult) {
+                // 一旦某个 && 块为 false，整体即 false
+                return false;
+            }
+        }
+
+        return true;  // 所有块都满足
     }
 
     /**
@@ -136,6 +150,7 @@ public class ConstraintData {
 
     /**
      * 获取第一个被打破的约束条件
+     *
      * @param constraints
      * @param conditionEnv
      * @param type

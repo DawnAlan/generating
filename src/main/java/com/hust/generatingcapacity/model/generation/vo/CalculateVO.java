@@ -36,6 +36,14 @@ public class CalculateVO {
         this.stationData = stationData;
     }
 
+    public CalculateVO(CalculateInput calInput,CalculateStep calStep, CalculateParam calParam, CalculateCondition calCondition,StationData stationData) {
+        this.calInput = calInput;
+        this.calStep = calStep;
+        this.calParam = calParam;
+        this.calCondition = calCondition;
+        this.stationData = stationData;
+    }
+
     public CalculateVO(CalculateStep calStep, CalculateParam calParam) {
         this.calStep = calStep;
         this.calParam = calParam;

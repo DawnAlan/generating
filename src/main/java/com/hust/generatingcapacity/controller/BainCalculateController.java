@@ -23,7 +23,7 @@ public class BainCalculateController {
     public ResponseMessage<String> add(@Validated @RequestBody GenerationCalSchemeDTO dto) {
         System.out.println(sdf.format(new Date()) + ":-----------已调用'basinCalculate'中计算某流域发电能力的功能----------");
         basinCalculateService.basinCalculate(dto);
-        return ResponseMessage.success(sdf.format(new Date())+":-----------流域发电能力计算中----------");
+        return ResponseMessage.success(sdf.format(new Date()) + ":-----------" + dto.getSchemeName() + "方案-流域发电能力计算中----------");
     }
 
 }
