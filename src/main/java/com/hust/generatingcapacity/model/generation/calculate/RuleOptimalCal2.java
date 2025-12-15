@@ -10,21 +10,23 @@ import com.hust.generatingcapacity.model.generation.domain.ConstraintData;
 import com.hust.generatingcapacity.model.generation.domain.StationData;
 import com.hust.generatingcapacity.model.generation.type.ParamType;
 import com.hust.generatingcapacity.model.generation.util.DisplayUtils;
-import com.hust.generatingcapacity.model.generation.vo.*;
+import com.hust.generatingcapacity.model.generation.vo.BoundPair;
+import com.hust.generatingcapacity.model.generation.vo.CalculateParam;
+import com.hust.generatingcapacity.model.generation.vo.CalculateStep;
+import com.hust.generatingcapacity.model.generation.vo.CalculateVO;
 import com.hust.generatingcapacity.tools.TimeUtils;
 import org.ojalgo.optimisation.Expression;
 import org.ojalgo.optimisation.ExpressionsBasedModel;
 import org.ojalgo.optimisation.Optimisation;
 import org.ojalgo.optimisation.Variable;
 import org.ojalgo.structure.Structure1D;
-import org.springframework.beans.BeanUtils;
 
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
 
-public class RuleOptimalCal {
+public class RuleOptimalCal2 {
 
     //变量优先级排序（与影响变量的参数优先级一致）
     static Map<Variable, ParamType> varPriorityMap = new HashMap<>();
@@ -33,21 +35,12 @@ public class RuleOptimalCal {
         CalculateStep data = calculateVO.getCalStep();
         CalculateParam calParam = calculateVO.getCalParam();
         StationData stationData = calculateVO.getStationData();
-        //复制一层原始约束
-        List<ConstraintData> oriConstraints = stationData.getConstraints()
-                .stream()
-                .map(c -> {
-                    ConstraintData copy = new ConstraintData();
-                    BeanUtils.copyProperties(c, copy);
-                    return copy;
-                })
-                .collect(Collectors.toList());
         System.out.println("\n开始计算电站 " + calParam.getStation() + " 时段 " + TimeUtils.formatDate(data.getTime()) + " 的发电能力，" + "初始水位为：" + data.getLevelBef() + ",入库径流为：" + data.getInFlow());
         try {
             //调度情景
             Map<String, Object> condition = new ConstraintEnvBuilder().conditionBuild(TimeUtils.getSpecificDate(data.getTime()).get("月"), data.getLevelBef(), calParam.getSchedulingL(), calParam.getPeriod(), data.getInFlow());
             // 1. 初算：使用完整约束
-            Map<ParamType, BoundPair> initialBound = getFirstParamBound(data, stationData, condition);
+            Map<ParamType, BoundPair> initialBound = getFirstParamBound(stationData, condition);
             Either<CalculateStep, ExpressionsBasedModel> step = calculate(data, calParam, stationData, initialBound);
             // 不需要修正，直接返回
             if (step.isLeft()) {
@@ -65,13 +58,11 @@ public class RuleOptimalCal {
                 try {
                     relaxedVar = getRelaxedParamBound(data, infeasibleModel, stationData, initialBound);// 放宽约束主函数
                 } catch (Exception e) {//找不到需要放宽的参数则丢给规程边界模型
-                    stationData.setConstraints(oriConstraints);
                     return new RuleBasedCal().run(calculateVO);
                 }
                 ParamType relaxType = varPriorityMap.get(relaxedVar.getKey());
                 ConstraintData firestViolatedCon = ConstraintData.getFirstViolatedConstraint(stationData.getConstraints(), condition, relaxType, relaxedVar.getValue());
                 if (firestViolatedCon == null) {//约束中没有这个参数
-                    stationData.setConstraints(oriConstraints);
                     return new RuleBasedCal().run(calculateVO);
                 }
                 Either<CalculateStep, ExpressionsBasedModel> nextStep = calculate(data, calParam, stationData, initialBound);
@@ -107,7 +98,6 @@ public class RuleOptimalCal {
             e.printStackTrace();
         }
         // 3. 全部放宽轮次耗尽，仍然需要修正/内部有报错信息 → 采用规程边界模型
-        stationData.setConstraints(oriConstraints);
         return new RuleBasedCal().run(calculateVO);
     }
 
@@ -141,13 +131,8 @@ public class RuleOptimalCal {
                 .stream()
                 .filter(cv -> cv.getCode() >= H_min && cv.getCode() <= H_max)
                 .collect(Collectors.toList());
-        if (reservoirStorageLine.size() < 2) {//补全以防后续无法插值求解
-            reservoirStorageLine = stationData.getReservoirStorageLine();
-        }
-        reservoirStorageLine = CodeValue.changePrecision(reservoirStorageLine, 0.1);//水位精度扩到0.1m及以上
-        if (reservoirStorageLine.size() > 300) {
-            reservoirStorageLine = CodeValue.enlargeStep(reservoirStorageLine, (reservoirStorageLine.size() / 300) + 1);
-        }
+        int stepR = reservoirStorageLine.size() / 100 + 1;
+        reservoirStorageLine = CodeValue.enlargeStep(reservoirStorageLine, stepR);
         Vb = CodeValue.linearInterpolation(Hb, reservoirStorageLine) * 1e6;
         //耗水率
         List<CodeValue> waterConsumptionLine = stationData.getWaterConsumptionLine().size() > 1 ?
@@ -155,10 +140,8 @@ public class RuleOptimalCal {
                         .filter(cv -> cv.getCode() >= H_min && cv.getCode() <= H_max)
                         .collect(Collectors.toList()) :
                 stationData.getWaterConsumptionLine();
-        waterConsumptionLine = CodeValue.changePrecision(waterConsumptionLine, 0.1);
-        if (waterConsumptionLine.size() > 300) {
-            waterConsumptionLine = CodeValue.enlargeStep(waterConsumptionLine, (waterConsumptionLine.size() / 300) + 1);
-        }
+        int stepW = waterConsumptionLine.size() / 100 + 1;
+        waterConsumptionLine = CodeValue.enlargeStep(waterConsumptionLine, stepW);
 
         //重新设置流量的上边界
         double dV_max = CodeValue.difference(Hb, H_min, reservoirStorageLine) * 1e6;
@@ -214,18 +197,12 @@ public class RuleOptimalCal {
                 .set(Ha, 1.0)
                 .set(dH, -1.0);
         constr2.level(Hb);        // 约束: Ha - dH = Hb  【即 dH = Ha - Hb】
-        // 3. 出库水量与流量关系: Va + Qo*t = Vb + Qin*t
-        Expression waterBalanceOnStorage = model.addExpression("storage_balance")
-                .set(Va, 1.0)
-                .set(Qo, t);
-        waterBalanceOnStorage.level(Vb + Qin * t);
 
-//
-//        // 3. 水量变幅定义: Vb = Va - dV
-//        Expression constr3 = model.addExpression("dV_def")
-//                .set(dV, -1.0)
-//                .set(Va, 1.0);
-//        constr3.level(Vb); //约束： Va - dV = Vb  【即 dV = Va - Vb】
+        // 3. 水量变幅定义: Vb = Va - dV
+        Expression constr3 = model.addExpression("dV_def")
+                .set(dV, -1.0)
+                .set(Va, 1.0);
+        constr3.level(Vb); //约束： Va - dV = Vb  【即 dV = Va - Vb】
 
         // 4. 发电水量与流量关系: Vp = Qp * t
         Expression constr4 = model.addExpression("Vp_def")
@@ -233,11 +210,42 @@ public class RuleOptimalCal {
                 .set(Qp, -t);
         constr4.level(0.0);       // 约束: Vp - t*Qp = 0  【即 Vp = Qp * t】
 
-//        // 5. 出库水量与流量关系: dV = (Qin-Qo) * t
-//        Expression constr5 = model.addExpression("dV_def_Q")
-//                .set(dV, 1)
-//                .set(Qo, t);
-//        constr5.level(Qin * t); // 约束: dV + Qo*t = Qin*t
+        // 5. 出库水量与流量关系: dV = (Qin-Qo) * t
+        Expression constr5 = model.addExpression("dV_def_Q")
+                .set(dV, 1)
+                .set(Qo, t);
+        constr5.level(Qin * t); // 约束: dV + Qo*t = Qin*t
+
+        // Big-M & 容差
+        double M_spill = Math.max(0.0, Q_max);        // 能覆盖“最大弃水”
+        double M_q = Math.max(Qp_max, 1.0);        // 至少不小于 Qp_max
+        double tau = Math.max(1e-6 * Qp_max, 1e-3);
+
+        // 二进制：是否满发
+        Variable z_full = addVar(model, "z_full", 0.0, 1.0).integer(true);
+
+        // (A) 非满发不许弃水：Qo - Qp ≤ M_spill * z_full
+        Expression spill_only_if_full = model.addExpression("spill_only_if_full")
+                .set(Qo, 1.0)
+                .set(Qp, -1.0)
+                .set(z_full, -M_spill);  // Qo - Qp - M_spill*z_full ≤ 0
+        spill_only_if_full.upper(0.0);
+
+        // (B) 满发判定：Qp ≥ Qp_max − τ − M_q * (1 − z_full)
+        // 等价：Qp - M_q*z_full ≥ Qp_max - τ - M_q
+        Expression full_definition = model.addExpression("full_definition")
+                .set(Qp, 1.0)
+                .set(z_full, -M_q);
+        full_definition.lower(Qp_max - tau - M_q);
+
+        // 弃水软惩罚
+//        double eps = 0.05; // 计算最小发电量时，弃水约束应增大权重
+        double eps = calParam.isGenMin() ? 0.01 : 0.1; // 计算最小发电量时，弃水约束应增大权重
+        Variable S_spill = addVar(model, "S_spill", 0.0, Math.max(0, cound.get(ParamType.Qo).getMaxVal() - cound.get(ParamType.Qp).getMaxVal()));
+        Expression spill_def1 = model.addExpression("spill_ge_Qo_minus_Qp")
+                .set(S_spill, 1.0).set(Qo, -1.0).set(Qp, 1.0);
+        spill_def1.lower(0.0); // S_spill - Qo + Qp >= 0  -> S_spill >= Qo - Qp
+
 
         // 发电计算
         Variable Lc;
@@ -267,92 +275,43 @@ public class RuleOptimalCal {
             constr6.level(0.0);
         }
 
-        boolean allowSpill = false;
-        int count = 0;
-        do {
-            if (!allowSpill) {
-                // 额外加一条：禁止弃水 → Qo = Qp
-                Expression noSpill = model.addExpression("Qo_eq_Qp")
-                        .set(Qo, 1.0)
-                        .set(Qp, -1.0);
-                noSpill.level(0.0);
-            } else {
-                model.removeExpression("Qo_eq_Qp");
-                // 非满发不弃水 Big-M & 容差
-                double M_spill = Math.max(0.0, Q_max);      // 能覆盖“最大弃水”
-                double M_q = Math.max(Qp_max, 1.0);         // 至少不小于 Qp_max
-                double tau = Math.max(1e-6 * Qp_max, 1e-3);
-                Variable z_full;
-                // 二进制：是否满发（只在最大发电模式下使用）
-                z_full = addVar(model, "z_full", 0.0, 1.0).integer(true);
-                // (A) 非满发不许弃水：Qo - Qp ≤ M_spill * z_full
-                Expression spill_only_if_full = model.addExpression("spill_only_if_full")
-                        .set(Qo, 1.0)
-                        .set(Qp, -1.0)
-                        .set(z_full, -M_spill);  // Qo - Qp - M_spill*z_full ≤ 0
-                spill_only_if_full.upper(0.0);
-                // (B) 满发判定：Qp ≥ Qp_max − τ − M_q * (1 − z_full)
-                // 等价：Qp - M_q*z_full ≥ Qp_max - τ - M_q
-                Expression full_definition = model.addExpression("full_definition")
-                        .set(Qp, 1.0)
-                        .set(z_full, -M_q);
-                full_definition.lower(Qp_max - tau - M_q);
-                // 弃水软惩罚变量：S_spill ≥ Qo - Qp, S_spill ≥ 0
-                double spillMax = Math.max(0, cound.get(ParamType.Qo).getMaxVal() - cound.get(ParamType.Qp).getMaxVal());
-                Variable S_spill = addVar(model, "S_spill", 0.0, spillMax);
-                Expression spill_def1 = model.addExpression("spill_ge_Qo_minus_Qp")
-                        .set(S_spill, 1.0)
-                        .set(Qo, -1.0)
-                        .set(Qp, 1.0);
-                spill_def1.lower(0.0); // S_spill - Qo + Qp ≥ 0  →  S_spill ≥ Qo - Qp
-                //弃水水最小
-                double eps = 0.1;
-                S_spill.weight(-eps); // maximise(Gen - eps * S_spill)
-            }
+        // === 目标：最大化 Gen ===
+        if (calParam.isGenMin()) {
+            Gen.weight(-1.0);
+        } else {
+            Gen.weight(1.0);
+        }
+        // 目标：轻微惩罚弃水
+        S_spill.weight(-eps);
 
-            // 目标权重部分
-            if (calParam.isGenMin()) {
-                Gen.weight(-1.0);
-            } else {
-                Gen.weight(1.0);
-            }
-            // 求解
-            model.options.time_abort = 30000;    // 运行 30s 后强制停止
-            model.options.iterations_abort = 1000000; // 达到最大迭代数后停止
-            Optimisation.Result rs = model.maximise();
-            //判断是否有解
-            if (count == 0) {//不弃水
-                if (!rs.getState().isFeasible()) {
-                    allowSpill = true;
-                    count++;
-                } else {
-                    data.setLevelAft(Ha.getValue().doubleValue());
-                    data.setQp(Qp.getValue().doubleValue());
-                    data.setQo(Qo.getValue().doubleValue());
-                    data.setCalGen(Gen.getValue().doubleValue());
-                    return Either.left(data);
-                }
-            } else {//弃水
-                if (!rs.getState().isFeasible()) {
-                    return Either.right(model);
-                } else {
-                    data.setLevelAft(Ha.getValue().doubleValue());
-                    data.setQp(Qp.getValue().doubleValue());
-                    data.setQo(Qo.getValue().doubleValue());
-                    data.setCalGen(Gen.getValue().doubleValue());
-                    return Either.left(data);
-                }
-            }
-        } while (count < 2);
-        return Either.right(model);
+
+        // 求解
+        model.options.time_abort = 30000;    // 运行 30s 后强制停止
+        model.options.iterations_abort = 1000000; // 达到最大迭代数后停止
+        Optimisation.Result rs = model.maximise();
+
+        // 存储结果
+//        if (rs.getState().equals(Optimisation.State.INFEASIBLE)){//人工分析无解原因
+//            InfeasibleBoundCheck.analyse(model);
+//        }
+//        data.setRemark(String.valueOf(rs.getState()));//记录此次运算状态
+        data.setRevise(!rs.getState().isFeasible());//记录是否需要修正
+        data.setLevelAft(Ha.getValue().doubleValue());
+        data.setQp(Qp.getValue().doubleValue());
+        data.setQo(Qo.getValue().doubleValue());
+        data.setCalGen(Gen.getValue().doubleValue());
+        //有解则返回解，无解则返回模型
+        if (rs.getState().isFeasible()) return Either.left(data);
+        else return Either.right(model);
     }
 
     /**
      * 获取参数边界
      *
+     * @param stationData
      * @return
      */
-    public static Map<ParamType, BoundPair> getFirstParamBound(CalculateStep data, StationData stationData, Map<String, Object> condition) {
+    public static Map<ParamType, BoundPair> getFirstParamBound(StationData stationData, Map<String, Object> condition) {
         //获取参数边界
         List<ConstraintData> constraints = stationData.getConstraints();
         Map<ParamType, BoundPair> cound = stationData.setInitialBoundPair();
@@ -361,17 +320,6 @@ public class RuleOptimalCal {
                 List<String> paramList = constraint.getParam();
                 new ConstraintData().getParamBoundPair(paramList, condition, cound);
             }
-        }
-        //添加枯水期水位变幅约束
-        Map<String, Integer> timeMap = TimeUtils.getSpecificDate(data.getTime());
-        boolean isFloodSeason = timeMap.get("月") <= 10 && timeMap.get("月") >= 5;
-        if (!isFloodSeason) {
-            double H_min = cound.get(ParamType.H).getMinVal();
-            int leng = TimeUtils.getDateDuration(data.getTime(), TimeUtils.createDate(timeMap.get("年") + 1, 5, 1, 0, 0), "日");
-            double dH = Math.max(data.getLevelBef() - H_min, 0) / Math.max(leng, 1);
-            double dH_Math = cound.get(ParamType.dH).getMinVal();
-            dH = Math.min(dH * (-1), dH_Math);
-            cound.get(ParamType.dH).setMinVal(dH);
         }
         return cound;
     }
@@ -489,8 +437,8 @@ public class RuleOptimalCal {
         List<ConstraintData> constraints = stationData.getConstraints();
         List<String> paramExprList = new ArrayList<>();
         if (firstViolatedCon == null) {//需要调整的参数没有找到对应的约束
-            List<ConstraintData> rigidConstraints = constraints.stream().filter(ConstraintData::getRigid).collect(Collectors.toList());
-            List<ConstraintData> nonRigidConstraints = constraints.stream().filter(c -> !c.getRigid()).collect(Collectors.toList());
+            List<ConstraintData> rigidConstraints = constraints.stream().filter(ConstraintData::getRigid).toList();
+            List<ConstraintData> nonRigidConstraints = constraints.stream().filter(c -> !c.getRigid()).toList();
             //本次剔除哪种参数约束
             int typeCount = ParamType.values().length;
             Set<ParamType> excludedTypes;
@@ -564,6 +512,101 @@ public class RuleOptimalCal {
             }
         }
     }
+
+//    /**
+//     * 构建 “Ha = Σ H[i]*λ[i]、Σλ=1” 的分段线性化骨架，并用二进制 z[s] 限制 λ 只在一个相邻段内非零。
+//     * 返回 PiecewiseLambdas，以便后续把其他量（Va, Lc …）用同一套 λ 绑定。
+//     * <p>
+//     * 约束：
+//     * (1) Σ λ[i] = 1
+//     * (2) Ha = Σ H[i]·λ[i]
+//     * (3) Σ z[s] = 1
+//     * (4) λ[0] ≤ z[0]; λ[i] ≤ z[i-1]+z[i]; λ[n-1] ≤ z[n-2]
+//     * <p>
+//     * 要求 Hgrid 严格递增，长度 ≥ 2。
+//     */
+//    public static PiecewiseLambdas addPiecewiseHa(ExpressionsBasedModel model, Variable Ha, double[] Hgrid) {
+//        if (Hgrid == null || Hgrid.length < 2) {
+//            throw new IllegalArgumentException("Hgrid 至少需要两个点。");
+//        }
+//        // 检查递增
+//        for (int i = 1; i < Hgrid.length; i++) {
+//            if (!(Hgrid[i] > Hgrid[i - 1])) {
+//                throw new IllegalArgumentException("Hgrid 必须严格递增: " + Arrays.toString(Hgrid));
+//            }
+//        }
+//        final int n = Hgrid.length;
+//        final int sCount = n - 1;
+//
+//        // λ[i] ∈ [0,1]
+//        List<Variable> lambdas = new ArrayList<>(n);
+//        for (int i = 0; i < n; i++) {
+//            Variable lam = model.addVariable("lam_" + i).lower(0.0).upper(1.0);
+//            lambdas.add(lam);
+//        }
+//
+//        // 段选择 z[s] ∈ {0,1}
+//        List<Variable> zList = new ArrayList<>(sCount);
+//        for (int s = 0; s < sCount; s++) {
+//            Variable z = model.addVariable("seg_" + s).binary();
+//            zList.add(z);
+//        }
+//
+//        // Σ λ = 1
+//        Expression sumLam = model.addExpression("sum_lambda");
+//        for (Variable lam : lambdas) sumLam.set(lam, 1.0);
+//        sumLam.level(1.0);
+//
+//        // Ha = Σ H[i]*λ[i]
+//        Expression defHa = model.addExpression("Ha_by_lambda").set(Ha, -1.0);
+//        for (int i = 0; i < n; i++) defHa.set(lambdas.get(i), Hgrid[i]);
+//        defHa.level(0.0);
+//
+//        // Σ z = 1  （只选一个 segment）
+//        Expression sumZ = model.addExpression("sum_seg");
+//        for (Variable z : zList) sumZ.set(z, 1.0);
+//        sumZ.level(1.0);
+//
+//        // 限制 λ 只能落在被选中的相邻两端点
+//        // λ[0] ≤ z[0]
+//        model.addExpression("lam_0_link").set(lambdas.get(0), 1.0).set(zList.get(0), -1.0).upper(0.0);
+//
+//        // λ[i] ≤ z[i-1] + z[i]  (i=1..n-2)
+//        for (int i = 1; i <= n - 2; i++) {
+//            Expression link = model.addExpression("lam_" + i + "_link");
+//            link.set(lambdas.get(i), 1.0);
+//            link.set(zList.get(i - 1), -1.0);
+//            link.set(zList.get(i), -1.0);
+//            link.upper(0.0);
+//        }
+//
+//        // λ[n-1] ≤ z[n-2]
+//        model.addExpression("lam_last_link")
+//                .set(lambdas.get(n - 1), 1.0)
+//                .set(zList.get(n - 2), -1.0)
+//                .upper(0.0);
+//
+//        return new PiecewiseLambdas(lambdas, zList, Hgrid);
+//    }
+
+//    /**
+//     * 把任意“跟随 Ha 的量”用同一套 λ 绑定：
+//     * target = Σ coef[i] * λ[i]
+//     * 其中 coef[i] 是该量在 Hgrid[i] 处的函数值（与 addPiecewiseHa 用的 Hgrid 同一网格）。
+//     * 例：Va = Σ V[i]*λ[i]（V 为绝对库容，单位统一！）
+//     * Lc = Σ Lc[i]*λ[i]（Lc 为耗水率值）
+//     */
+//    public static void linkLinearByLambda(ExpressionsBasedModel model, Variable target, PiecewiseLambdas lam, double[] coefOnSameHGrid) {
+//        if (coefOnSameHGrid == null || coefOnSameHGrid.length != lam.size()) {
+//            throw new IllegalArgumentException("coef 长度必须与 λ 数量一致，且与同一套 Hgrid 对齐。");
+//        }
+//        Expression expr = model.addExpression(target.getName() + "_by_lambda")
+//                .set(target, -1.0);
+//        for (int i = 0; i < lam.size(); i++) {
+//            expr.set(lam.lambdas.get(i), coefOnSameHGrid[i]);
+//        }
+//        expr.level(0.0);
+//    }
 
     /**
      * McCormick 双线性松弛：Z = X * Y 的线性包络

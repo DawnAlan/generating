@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class GenerationCalSchemeService implements IGenerationCalSchemeService {
@@ -26,18 +27,17 @@ public class GenerationCalSchemeService implements IGenerationCalSchemeService {
     private GenerationCalStationOutRepository generationCalStationOutRepository;
     @Autowired
     private GenerationCalBasinOutRepository generationCalBasinOutRepository;
+
     @Transactional
     @Override
     public GenerationCalSchemeDTO getGenerationCalSchemeDTO(String schemeName) {
         Integer id = generationCalSchemeRepository.findIdByName(schemeName).orElseThrow(() -> new IllegalArgumentException("未按方案名称找到对应方案数据！"));
-
         GenerationCalScheme generationCalScheme = generationCalSchemeRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("未按方案id找到对应方案数据！"));
         List<GenerationCalBasinOut> generationCalBasinOuts = generationCalScheme.getGenerationCalBasinOuts();
         List<GenerationCalBasinOutDTO> generationCalBasinOutDTOS = new ArrayList<>();
         for (GenerationCalBasinOut generationCalBasinOut : generationCalBasinOuts) {
             GenerationCalBasinOutDTO basinOutDTO = new GenerationCalBasinOutDTO();
             BeanUtils.copyProperties(generationCalBasinOut, basinOutDTO);
-
             List<GenerationCalStationOut> calStationOuts = generationCalBasinOut.getGenerationCalStationOuts();
             List<GenerationCalStationOutDTO> stationOutDTOs = new ArrayList<>();
             for (GenerationCalStationOut generationCalStationOut : calStationOuts) {
@@ -45,17 +45,36 @@ public class GenerationCalSchemeService implements IGenerationCalSchemeService {
                 BeanUtils.copyProperties(generationCalStationOut, stationOutDTO);
                 stationOutDTOs.add(stationOutDTO);
             }
-
             basinOutDTO.setGenerationCalStationOuts(stationOutDTOs);
             generationCalBasinOutDTOS.add(basinOutDTO);
 
         }
-
         GenerationCalSchemeDTO generationCalSchemeDTO = new GenerationCalSchemeDTO();
-        BeanUtils.copyProperties(generationCalScheme,generationCalSchemeDTO);
+        BeanUtils.copyProperties(generationCalScheme, generationCalSchemeDTO);
         generationCalSchemeDTO.setGenerationCalBasinOuts(generationCalBasinOutDTOS);
-
         return generationCalSchemeDTO;
+    }
+
+    @Override
+    public String deleteGenerationCalScheme(String schemeName) {
+        Integer id = generationCalSchemeRepository.findIdByName(schemeName).orElseThrow(() -> new IllegalArgumentException("未按方案名称找到对应方案数据！"));
+        generationCalSchemeRepository.deleteById(id);
+        return schemeName + " 方案已被顺利删除。";
+    }
+
+    @Override
+    public Boolean isSchemeExist(String schemeName) {
+        Optional<Integer> id = generationCalSchemeRepository.findIdByName(schemeName);
+        return id.isPresent();
+    }
+
+    @Override
+    public String changeSchemeName(String schemeName, String newName) {
+        Integer id = generationCalSchemeRepository.findIdByName(schemeName).orElseThrow(() -> new IllegalArgumentException("未按方案名称找到对应方案数据！"));
+        GenerationCalScheme generationCalScheme = generationCalSchemeRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("未按方案id找到对应方案数据！"));
+        generationCalScheme.setSchemeName(newName);
+        generationCalSchemeRepository.save(generationCalScheme);
+        return schemeName + " 方案名称成功被修改为： " + newName;
     }
 
 }

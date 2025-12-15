@@ -2,8 +2,10 @@ package com.hust.generatingcapacity.model.generation.calculate;
 
 import com.hust.generatingcapacity.model.generation.dispatch.ConstraintEnvBuilder;
 import com.hust.generatingcapacity.model.generation.domain.*;
+import com.hust.generatingcapacity.model.generation.type.ConstraintType;
 import com.hust.generatingcapacity.model.generation.type.ParamType;
 import com.hust.generatingcapacity.model.generation.type.PreConditionType;
+import com.hust.generatingcapacity.model.generation.util.DisplayUtils;
 import com.hust.generatingcapacity.model.generation.vo.*;
 import com.hust.generatingcapacity.tools.TimeUtils;
 import org.springframework.beans.BeanUtils;
@@ -22,12 +24,11 @@ public class RuleBasedCal {
         stationData.setConstraints(new ArrayList<>(base.getConstraints() == null
                 ? List.of()
                 : base.getConstraints()));
-
         // 确保“水库特征约束”只加一次
         boolean alreadyHasReservoirConstraint = stationData.getConstraints().stream()
-                .anyMatch(c -> "水库特征约束".equals(c.getConstraintType()));
+                .anyMatch(c -> ConstraintType.Reservoir_Characteristic.equals(c.getConstraintType()));
         if (!alreadyHasReservoirConstraint) {
-            Map<ParamType, BoundPair> initialBoundPair = stationData.setInitialBoundPair(); // 改成对 working 操作更安全
+            Map<ParamType, BoundPair> initialBoundPair = stationData.setInitialBoundPair();
             if (initialBoundPair != null && !initialBoundPair.isEmpty()) {
                 for (Map.Entry<ParamType, BoundPair> entry : initialBoundPair.entrySet()) {
                     BoundPair boundPair = entry.getValue();
@@ -40,12 +41,42 @@ public class RuleBasedCal {
                     }
                     param.add(boundPair.toParamMaxString(calParam.getPeriod()));
                     ConstraintData constraintData = new ConstraintData();
-                    constraintData.setConstraintType("水库特征约束");
+                    constraintData.setConstraintType(ConstraintType.fromCode("水库特征"));
                     constraintData.setRigid(true);
                     constraintData.setDescription("水库基本特征约束");
                     constraintData.setCondition("dL >= 1"); // 恒真条件
                     constraintData.setParam(param);
                     stationData.getConstraints().add(constraintData);
+                }
+            }
+        }
+        //添加枯水期水位变幅约束
+        Map<String, Integer> timeMap = TimeUtils.getSpecificDate(data.getTime());
+        boolean isFloodSeason = timeMap.get("月") <= 10 && timeMap.get("月") >= 5;
+        if (!isFloodSeason) {
+            Map<ParamType, BoundPair> initialBoundPair = stationData.setInitialBoundPair();
+            double H_min = initialBoundPair.get(ParamType.H).getMinVal();
+            if (H_min > 0) {
+                int leng = TimeUtils.getDateDuration(data.getTime(), TimeUtils.createDate(timeMap.get("年") + 1, 5, 1, 0, 0), "日");
+                double dH = Math.max(data.getLevelBef() - H_min, 0) / Math.max(leng, 1);
+                double dH_Math;
+                List<ConstraintData> constraints = stationData.getConstraints();
+                for (ConstraintData constraintData : constraints) {
+                    if (constraintData.getConstraintType().equals(ConstraintType.Water_Level_Fluctuation) && constraintData.getDescription().contains("统计数据结果")) {
+                        List<String> param = constraintData.getParam();
+                        for (String exp : param) {
+                            if (DisplayUtils.getMessageFromExp(exp, "param").equals("dH") && DisplayUtils.getMessageFromExp(exp, "op").equals(">=")) {
+                                try {
+                                    dH_Math = Double.parseDouble(DisplayUtils.getMessageFromExp(exp, "value"));
+                                } catch (Exception e) {
+                                    dH_Math = 0.0;
+                                }
+                                dH = Math.min(dH_Math, dH * (-1));
+                                param.remove(exp);
+                                param.add("dH >= " + dH);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -313,11 +344,11 @@ public class RuleBasedCal {
         switch (type) {
             case Qo -> {
                 double qo = value;
-                double qp = Math.min(qpMax,value);
+                double qp = Math.min(qpMax, value);
                 applyResult(data, qp, qo, rate, calParam, stationData);
             }
             case Qp -> {
-                double qp = Math.min(qpMax,value);
+                double qp = Math.min(qpMax, value);
                 double qo = Math.max(data.getQo(), qp);
                 applyResult(data, qp, qo, rate, calParam, stationData);
             }
@@ -325,14 +356,14 @@ public class RuleBasedCal {
                 double H_aft = data.getLevelBef() + value;
                 data.setLevelAft(H_aft);
                 double qo_cal = calculateQo(H_aft, data, calParam, stationData);
-                double qp = Math.min(qpMax,qo_cal);
+                double qp = Math.min(qpMax, qo_cal);
                 applyResult(data, qp, qo_cal, rate, calParam, stationData);
             }
             case H -> {
                 double H_aft = value;
                 data.setLevelAft(H_aft);
                 double qo_cal = calculateQo(H_aft, data, calParam, stationData);
-                double qp = Math.min(qpMax,qo_cal);
+                double qp = Math.min(qpMax, qo_cal);
                 applyResult(data, qp, qo_cal, rate, calParam, stationData);
             }
             case P -> {
@@ -374,9 +405,14 @@ public class RuleBasedCal {
     private static CalculateStep calculateMaxFirstTime(CalculateStep data, CalculateParam calParam, StationData stationData) {
         if (calParam.isConsiderH()) {
             // 计算 qpMax
-            double qpMax = stationData.getNHQLines().stream()
-                    .mapToDouble(line -> NHQData.getMaxQ(data.getHead(), line))
-                    .sum();
+            double qpMax = 0.0;
+            try {
+                qpMax = stationData.getNHQLines().stream()
+                        .mapToDouble(line -> NHQData.getMaxQ(data.getHead(), line))
+                        .sum();
+            } catch (Exception e) {
+                System.out.println(stationData.getStationName() + "无NHQ曲线数据……");
+            }
             double rate = CodeValue.linearInterpolation(data.getLevelBef(), stationData.getWaterConsumptionLine());
             qpMax = qpMax == 0.0 ? stationData.getInstalledCapacity() * rate / 1e-3 / 3600 : qpMax;
             data.setQp(qpMax);
@@ -415,9 +451,14 @@ public class RuleBasedCal {
      */
     private static CalculateStep calculateMaxRevision(CalculateStep data, CalculateParam calParam, ParamValue paramValue, StationData stationData) {
         if (calParam.isConsiderH()) {
-            double qpMax = stationData.getNHQLines().stream()
-                    .mapToDouble(line -> NHQData.getMaxQ(data.getHead(), line))
-                    .sum();
+            double qpMax = 0.0;
+            try {
+                qpMax = stationData.getNHQLines().stream()
+                        .mapToDouble(line -> NHQData.getMaxQ(data.getHead(), line))
+                        .sum();
+            } catch (Exception e) {
+                System.out.println(stationData.getStationName() + "无NHQ曲线数据……");
+            }
             double rate = CodeValue.linearInterpolation(data.getLevelBef(), stationData.getWaterConsumptionLine());
             qpMax = qpMax == 0.0 ? stationData.getInstalledCapacity() * rate / 1e-3 / 3600 : qpMax;
             ParamType type = paramValue.getParamType();
@@ -429,8 +470,8 @@ public class RuleBasedCal {
                     applyResult(data, qp, qo, rate, calParam, stationData);
                 }
                 case Qp -> {
-                    double qp = value;
-                    double qo = Math.max(data.getQo(), qp);
+                    double qp = Math.min(qpMax, value);
+                    double qo = Math.max(data.getQo(), value);
                     applyResult(data, qp, qo, rate, calParam, stationData);
                 }
                 case dH -> {
@@ -449,7 +490,7 @@ public class RuleBasedCal {
                 }
                 case P -> {
                     double gen = value;
-                    double qp = gen * rate / 1e-3 / calParam.getPeriod();
+                    double qp = Math.min(qpMax, gen * rate / 1e-3 / calParam.getPeriod());
                     double qo = data.getQo();
                     applyResult(data, qp, qo, rate, calParam, stationData);
                 }
@@ -458,6 +499,7 @@ public class RuleBasedCal {
         } else {
             // 不考虑水头，即无具体数据
             double rate = stationData.getWaterConsumptionLine().get(0).getValue();
+            double qp_max = stationData.getInstalledCapacity() * rate / 1e-3 / 3600;
             if (paramValue.getParamType() == null || paramValue.getParamValue().isNaN()) {//无约束值
                 double qo = data.getInFlow();
                 double qp = data.getInFlow();
@@ -468,29 +510,31 @@ public class RuleBasedCal {
                 switch (type) {
                     case Qo -> {
                         double qo = value;
-                        double qp = qo;
+                        double qp = Math.min(qo, qp_max);
                         applyResult(data, qp, qo, rate, calParam, stationData);
                     }
                     case Qp -> {
-                        double qp = value;
-                        double qo = Math.max(data.getQo(), qp);
+                        double qp = Math.min(value, qp_max);
+                        double qo = Math.max(data.getQo(), value);
                         applyResult(data, qp, qo, rate, calParam, stationData);
                     }
                     case dH -> {
                         double H_aft = data.getLevelBef() + value;
                         data.setLevelAft(H_aft);
                         double qo_cal = calculateQo(H_aft, data, calParam, stationData);
-                        applyResult(data, qo_cal, qo_cal, rate, calParam, stationData);
+                        double qp = Math.min(qo_cal, qp_max);
+                        applyResult(data, qp, qo_cal, rate, calParam, stationData);
                     }
                     case H -> {
                         double H_aft = value;
                         data.setLevelAft(H_aft);
                         double qo_cal = calculateQo(H_aft, data, calParam, stationData);
-                        applyResult(data, qo_cal, qo_cal, rate, calParam, stationData);
+                        double qp = Math.min(qo_cal, qp_max);
+                        applyResult(data, qp, qo_cal, rate, calParam, stationData);
                     }
                     case P -> {
                         double gen = value;
-                        double qp = gen * rate / 1e-3 / calParam.getPeriod();
+                        double qp = Math.min(qp_max, gen * rate / 1e-3 / calParam.getPeriod());
                         applyResult(data, qp, data.getQo(), rate, calParam, stationData);
                     }
                     default -> throw new IllegalArgumentException("不支持的参数类型: " + type);

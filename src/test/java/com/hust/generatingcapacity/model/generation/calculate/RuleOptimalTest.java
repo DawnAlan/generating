@@ -53,7 +53,7 @@ public class RuleOptimalTest {
         calParam.setConsiderH(true);
         calParam.setStation("猴子岩");
         calParam.setSchedulingL(1);
-        data = RuleOptimalCal.run(new CalculateVO(data, calParam, stationData));
+        data = new RuleOptimalCal().run(new CalculateVO(data, calParam, stationData));
         Assertions.assertNotNull(data);
         System.out.println(data.toString(1));
     }

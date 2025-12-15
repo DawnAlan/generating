@@ -3,6 +3,7 @@ package com.hust.generatingcapacity.service;
 import com.hust.generatingcapacity.dto.*;
 import com.hust.generatingcapacity.iservice.*;
 import com.hust.generatingcapacity.model.generation.calculate.CalDevelopmentProcess;
+import com.hust.generatingcapacity.model.generation.domain.ConstraintData;
 import com.hust.generatingcapacity.model.generation.domain.NHQCell;
 import com.hust.generatingcapacity.model.generation.domain.NHQData;
 import com.hust.generatingcapacity.model.generation.domain.StationData;
@@ -12,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class HydropowerStationService implements IHydropowerStationService {
@@ -94,7 +94,12 @@ public class HydropowerStationService implements IHydropowerStationService {
             stationData.setTailLevelFlowLine(dtoMapper.toCodeValueList(stationInfDTO.getTailLevelFlowLine()));
         }
         if (stationInfDTO.getConstraintInfs() != null && !stationInfDTO.getConstraintInfs().isEmpty()) {
-            stationData.setConstraints(dtoMapper.toConstraintDataList(stationInfDTO.getConstraintInfs()));
+            List<ConstraintData> constraintDatas = new ArrayList<>();
+            for (ConstraintInfDTO constraintInfDTO : stationInfDTO.getConstraintInfs()) {
+                ConstraintData constraintData = new ConstraintData(constraintInfDTO);
+                constraintDatas.add(constraintData);
+            }
+            stationData.setConstraints(constraintDatas);
         }
         if (stationInfDTO.getUnitInfs() != null) {
             List<List<NHQData>> nhqDataList = new ArrayList<>();

@@ -8,10 +8,8 @@ import com.hust.generatingcapacity.model.generation.domain.ConstraintData;
 import com.hust.generatingcapacity.model.generation.domain.StationData;
 import com.hust.generatingcapacity.model.generation.type.ParamType;
 import com.hust.generatingcapacity.model.generation.vo.BoundPair;
-import com.hust.generatingcapacity.model.generation.vo.PiecewiseLambdas;
 import org.junit.jupiter.api.Test;
 import org.ojalgo.optimisation.*;
-import org.ojalgo.type.context.NumberContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 

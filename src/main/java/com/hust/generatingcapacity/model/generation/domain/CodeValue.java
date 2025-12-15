@@ -26,6 +26,20 @@ public class CodeValue {
     public CodeValue() {
     }
 
+    public static List<CodeValue> changePrecision(List<CodeValue> codeValues, double precision) {
+        if (codeValues == null || codeValues.size() < 2) {
+            return codeValues;
+        }
+        //原有步长
+        double oriPrecision = (codeValues.get(codeValues.size() - 1).getCode() - codeValues.get(0).getCode()) / codeValues.size();
+        if (oriPrecision >= precision || oriPrecision == 0) {//原有步长不够精细，直接返回
+            return codeValues;
+        } else {
+            int step = (int) (precision / oriPrecision);
+            return enlargeStep(codeValues, step);
+        }
+    }
+
     public static List<CodeValue> enlargeStep(List<CodeValue> list, int factor) {
         List<CodeValue> result = new ArrayList<>();
         for (int i = 0; i < list.size(); i += factor) {
@@ -38,10 +52,10 @@ public class CodeValue {
     }
 
     public static List<CodeValue> exchangeCopy(List<CodeValue> original) {
-        List<CodeValue> result = new ArrayList<>(original.stream()
+        // 先获取不可变的列表，再转换为可变列表
+        return new ArrayList<>(original.stream()
                 .map(cv -> new CodeValue(cv.getValue(), cv.getCode()))
-                .collect(Collectors.toList()));  // 先获取不可变的列表，再转换为可变列表
-        return result;
+                .collect(Collectors.toList()));
     }
 
     public static double codeDifference(double value1, double value2, List<CodeValue> values) {
@@ -97,8 +111,8 @@ public class CodeValue {
             List<CodeValue> newValue1 = new ArrayList<>();
             List<CodeValue> newValue2 = new ArrayList<>();
             for (int i = 0; i < l; i++) {
-                newValue1.add( new CodeValue(minCode + i * step, linearInterpolation(minCode + i * step, value1)));
-                newValue2.add( new CodeValue(minCode + i * step, linearInterpolation(minCode + i * step, value2)));
+                newValue1.add(new CodeValue(minCode + i * step, linearInterpolation(minCode + i * step, value1)));
+                newValue2.add(new CodeValue(minCode + i * step, linearInterpolation(minCode + i * step, value2)));
             }
             value1.clear();
             value1.addAll(newValue1);
@@ -108,7 +122,7 @@ public class CodeValue {
     }
 
     public static double linearInterpolation(double targetCode, List<CodeValue> values) {
-        if (values.isEmpty()){
+        if (values.isEmpty()) {
             return 0.0;
         }
         //先对其进行排序
@@ -153,7 +167,7 @@ public class CodeValue {
     public static double codeLinearInterpolation(double targetValue, List<CodeValue> values) {
         //转换code-value
         List<CodeValue> exchangedValues = exchangeCopy(values);
-        return  linearInterpolation(targetValue, exchangedValues);
+        return linearInterpolation(targetValue, exchangedValues);
     }
 
     public static double getMaxCode(List<CodeValue> values) {

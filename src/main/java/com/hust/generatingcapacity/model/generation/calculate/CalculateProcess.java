@@ -1,9 +1,7 @@
 package com.hust.generatingcapacity.model.generation.calculate;
 
 import com.hust.generatingcapacity.model.generation.domain.ConstraintData;
-import com.hust.generatingcapacity.model.generation.type.DispatchType;
-import com.hust.generatingcapacity.model.generation.type.ParamType;
-import com.hust.generatingcapacity.model.generation.type.PreConditionType;
+import com.hust.generatingcapacity.model.generation.type.*;
 import com.hust.generatingcapacity.model.generation.util.DisplayUtils;
 import com.hust.generatingcapacity.model.generation.vo.*;
 import com.hust.generatingcapacity.model.generation.domain.StationData;
@@ -58,7 +56,7 @@ public class CalculateProcess {
         //对于流域进行输电断面的审查
         List<String> transmissionSections = stationDataList.stream()
                 .filter(s -> s.getConstraints().stream()
-                        .anyMatch(c -> c.getConstraintType().equals("通道约束")))
+                        .anyMatch(c -> c.getConstraintType().equals(ConstraintType.Channel_Constraint)))
                 .map(StationData::getTransmissionSection)
                 .distinct()
                 .filter(Objects::nonNull)
@@ -69,7 +67,7 @@ public class CalculateProcess {
                     .filter(stationData -> section.equals(stationData.getTransmissionSection()))
                     .toList();
             stationsInSection = stationsInSection.stream().filter(s -> s.getConstraints().stream()
-                            .anyMatch(c -> c.getConstraintType().equals("通道约束")))
+                            .anyMatch(c -> c.getConstraintType().equals(ConstraintType.Channel_Constraint)))
                     .toList();
             double totalCapacity = stationsInSection.stream()
                     .mapToDouble(StationData::getInstalledCapacity)
@@ -216,17 +214,17 @@ public class CalculateProcess {
     public static CalculateStep oneStepCalculate(CalculateVO calculateVO) {
         CalculateStep result;
         //无调度规程则直接预设条件，当作无调节电站计算
-        if (calculateVO.getStationData().getConstraints().isEmpty()) {
-            System.out.println("电站 " + calculateVO.getCalParam().getStation() + " 无调度规程，采用预设条件模型计算发电能力。");
+//        if (calculateVO.getStationData().getConstraints().isEmpty()) {
+//            System.out.println("电站 " + calculateVO.getCalParam().getStation() + " 无调度规程，采用预设条件模型计算发电能力。");
+//            CalculateCondition calCondition = new CalculateCondition(PreConditionType.Q_power, calculateVO.getStationData().getStationName());
+//            calculateVO.setCalCondition(calCondition);
+//            result = new PreConditionCal().run(calculateVO);
+//        } else
+        if (calculateVO.getStationData().getReservoirStorageLine().isEmpty()) {//无库容曲线则采用规程边界模型计算
+            System.out.println("电站 " + calculateVO.getCalParam().getStation() + " 无库容曲线，采用预设条件模型计算发电能力。");
             CalculateCondition calCondition = new CalculateCondition(PreConditionType.Q_power, calculateVO.getStationData().getStationName());
             calculateVO.setCalCondition(calCondition);
             result = new PreConditionCal().run(calculateVO);
-        } else if (calculateVO.getStationData().getReservoirStorageLine().isEmpty()) {//无库容曲线则采用规程边界模型计算
-            System.out.println("电站 " + calculateVO.getCalParam().getStation() + " 无库容曲线，采用规程边界模型计算发电能力。");
-            result = switch (calculateVO.getCalParam().getDispatchType()) {
-                case RULE_BASED, RULE_OPTIMIZE -> new RuleBasedCal().run(calculateVO);
-                case PRE_CONDITION -> new PreConditionCal().run(calculateVO);
-            };
         } else {
             result = switch (calculateVO.getCalParam().getDispatchType()) {
                 case RULE_BASED -> new RuleBasedCal().run(calculateVO);

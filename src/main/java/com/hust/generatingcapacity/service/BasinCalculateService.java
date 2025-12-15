@@ -8,6 +8,7 @@ import com.hust.generatingcapacity.entity.GenerationCalBasinOut;
 import com.hust.generatingcapacity.entity.GenerationCalScheme;
 import com.hust.generatingcapacity.entity.GenerationCalStationOut;
 import com.hust.generatingcapacity.iservice.IBasinCalculateService;
+import com.hust.generatingcapacity.iservice.IGenerationCalSchemeService;
 import com.hust.generatingcapacity.iservice.IHydropowerStationService;
 import com.hust.generatingcapacity.model.generation.calculate.CalDevelopmentProcess;
 import com.hust.generatingcapacity.model.generation.calculate.CalculateProcess;
@@ -43,7 +44,7 @@ public class BasinCalculateService implements IBasinCalculateService {
     @Autowired
     private GenerationCalSchemeService generationCalSchemeService;
     @Autowired
-    private GenerationCalStationOutRepository generationCalStationOutRepository;
+    private IGenerationCalSchemeService iGenerationCalSchemeService;
     @Autowired
     private GenerationCalBasinOutRepository generationCalBasinOutRepository;
 
@@ -52,6 +53,9 @@ public class BasinCalculateService implements IBasinCalculateService {
     @Override
     @Async("generationExecutor")
     public void basinCalculate(GenerationCalSchemeDTO generationCalSchemeDTO) {
+        if (iGenerationCalSchemeService.isSchemeExist(generationCalSchemeDTO.getSchemeName())) {
+            throw new RuntimeException(generationCalSchemeDTO.getSchemeName()+" 方案名称已存在，请重新命名！");
+        }
         GenerationCalScheme scheme = new GenerationCalScheme();
         BeanUtils.copyProperties(generationCalSchemeDTO, scheme);
 //        List<GenerationCalBasinOutDTO> generationCalBasinOutDTOs = new ArrayList<>();
@@ -62,7 +66,7 @@ public class BasinCalculateService implements IBasinCalculateService {
         Date end = generationCalSchemeDTO.getEndDate();
         int schedulingL = generationCalSchemeDTO.getSchemeL();
         String period = generationCalSchemeDTO.getPeriod();
-        boolean isGenMin = true; //是否计算最小发电能力
+        boolean isGenMin = false; //是否计算最小发电能力
         //获取各流域电站数据
         Map<String, List<StationData>> basinStationDataMap = getStationDataMap(basin);
         Map<String, StationData> stationDataMap = new LinkedHashMap<>();
@@ -72,17 +76,17 @@ public class BasinCalculateService implements IBasinCalculateService {
             });
         });
         //从表格中获取数据
-        Map<String, Object[][]> dataMap = setdataMap(stationDataMap);
+        Map<String, Object[][]> dataMap = setdataMap(stationDataMap,generationCalSchemeDTO.getSchemeName());
 
         //计算单一方案
         int number = TimeUtils.getDateDuration(start, end, period);
-        for (int genMin = 0; genMin < 1; genMin++) {
+        for (int genMin = 0; genMin <= 1; genMin++) {
 //            Map<String, List<CalculateStep>> result = new LinkedHashMap<>();
-            if (genMin > 0) {
-                isGenMin = true;
-            }
             if (dispatchType.equals("预设条件")) {
                 genMin++;
+            }
+            if (genMin > 0) {
+                isGenMin = true;
             }
             for (int i = 0; i < number; i++) {//计算多个方案
                 Date startDate = TimeUtils.addCalendar(start, period, i);
@@ -150,9 +154,9 @@ public class BasinCalculateService implements IBasinCalculateService {
                 generationCalStationOutDTOS.addAll(generationCalBasinOutDTO.getGenerationCalStationOuts());
             }
             int genStatus;
-            if (!isGenMin){
+            if (!isGenMin) {
                 genStatus = 1;
-            }else {
+            } else {
                 if (generationCalSchemeDTO.getDispatchType().equals(DispatchType.PRE_CONDITION.getDesc())) {
                     genStatus = 2;
                 } else {
@@ -187,13 +191,17 @@ public class BasinCalculateService implements IBasinCalculateService {
      * @param stationDataMap
      * @return
      */
-    private static Map<String, Object[][]> setdataMap(Map<String, StationData> stationDataMap) {
+    private static Map<String, Object[][]> setdataMap(Map<String, StationData> stationDataMap,String schemeName) {
         Map<String, Object[][]> dataMap = new HashMap<>();
         for (String stationName : stationDataMap.keySet()) {
             String basinName = stationDataMap.get(stationName).getBasin();
             Object[][] data = new Object[0][0];
             try {
-                data = ExcelUtils.readExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basinName + "\\" + basinName + "水电站2023年日尺度整合数据.xlsx", stationName);
+                if (schemeName.contains("预报")){
+                    data = ExcelUtils.readExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basinName + "\\" + basinName + "水电站2023年预报日尺度整合数据.xlsx", stationName);
+                }else {
+                    data = ExcelUtils.readExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basinName + "\\" + basinName + "水电站2023年日尺度整合数据.xlsx", stationName);
+                }
             } catch (Exception e) {
                 System.out.println(e.getMessage());
             }
@@ -391,7 +399,11 @@ public class BasinCalculateService implements IBasinCalculateService {
             if (!isGenMin) {
                 ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "\\" + scheme + "日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
             } else {
-                ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "\\" + scheme + "日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+                if (dto.getDispatchType().equals("预设条件")) {
+                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "\\" + scheme + "日尺度模拟发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+                } else {
+                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "\\" + scheme + "日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+                }
             }
         }
     }

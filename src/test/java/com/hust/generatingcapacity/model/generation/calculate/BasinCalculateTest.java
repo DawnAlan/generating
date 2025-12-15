@@ -4,6 +4,7 @@ import com.hust.generatingcapacity.GeneratingCapacityApplication;
 import com.hust.generatingcapacity.dto.StationBaseInfDTO;
 import com.hust.generatingcapacity.iservice.IHydropowerStationService;
 import com.hust.generatingcapacity.model.generation.domain.StationData;
+import com.hust.generatingcapacity.model.generation.type.PreConditionType;
 import com.hust.generatingcapacity.model.generation.vo.*;
 import com.hust.generatingcapacity.repository.HydropowerStationRepository;
 import com.hust.generatingcapacity.tools.ExcelUtils;
@@ -28,12 +29,12 @@ public class BasinCalculateTest {
     @Test
     void basinRuleBasedTest() {
         String basin = "大渡河";
-        String DispatchType = "规则调度";
-        Date start = sdf.parse("2023-07-07", new java.text.ParsePosition(0));
-        Date end = sdf.parse("2023-07-09", new java.text.ParsePosition(0));
+        String dispatchType = "规程优化";
+        Date start = sdf.parse("2023-01-01", new java.text.ParsePosition(0));
+        Date end = sdf.parse("2023-01-03", new java.text.ParsePosition(0));
         int schedulingL = 1;
         String period = "日";
-        boolean isGenMin = false; //是否计算最小发电能力
+        boolean isGenMin = true; //是否计算最小发电能力
         //获取各流域电站数据
         Map<String, List<StationData>> basinStationDataMap = getStationDataMap(basin);
         Map<String, StationData> stationDataMap = new LinkedHashMap<>();
@@ -66,6 +67,7 @@ public class BasinCalculateTest {
                 CalculateDevelopment calculateDevelopment = new CalculateDevelopment();
                 //获取各电站输入信息
                 Map<String, CalculateInput> calculateInputs = new LinkedHashMap<>();
+                Map<String, CalculateCondition> calculateConditions = new LinkedHashMap<>();
                 for (String stationName : stationDataMap.keySet()) {
                     CalculateInput calculateInput = new CalculateInput(stationName, startDate, period);
                     getCalInputFromExcel(dataMap.get(stationName), calculateInput);
@@ -80,15 +82,27 @@ public class BasinCalculateTest {
                     }
                     calculateInput.checkForecast(schedulingL);
                     calculateInputs.put(stationName, calculateInput);
+                    //获取电站约束（待完善）预设条件模型目前按照末水位来计算
+                    if (dispatchType.equals(com.hust.generatingcapacity.model.generation.type.DispatchType.PRE_CONDITION.getDesc())) {
+                        CalculateCondition calculateCondition = new CalculateCondition();
+                        calculateCondition.setStation(stationName);
+                        calculateCondition.setPreCondition(PreConditionType.H_after);
+                        double hAfter = getHAfterFromExcel(dataMap.get(stationName), TimeUtils.addCalendar(startDate, period, 1), period);
+                        if (hAfter == 0.0) {
+                            hAfter = calculateInput.getWaterLevel(); //防守
+                        }
+                        calculateCondition.setPreValue(hAfter);
+                        calculateConditions.put(stationName, calculateCondition);
+                    }
                 }
                 //组装计算对象
                 calculateDevelopment.setBasin(basin);
                 calculateDevelopment.setStartDate(startDate);
                 calculateDevelopment.setEndDate(endDate);
-                calculateDevelopment.setDispatchType(DispatchType);
+                calculateDevelopment.setDispatchType(dispatchType);
                 calculateDevelopment.setPeriod(period);
                 calculateDevelopment.setCalculateInputs(calculateInputs);
-                calculateDevelopment.setCalculateConditions(null); //预设条件的时候在赋值
+                calculateDevelopment.setCalculateConditions(calculateConditions); //预设条件的时候在赋值
                 //输入数据封装
                 Map<String, CalculateVO> calculateVO = CalDevelopmentProcess.setCalculateVO(calculateDevelopment, basinStationDataMap, isGenMin);
                 // 当前时段所有电站的计算结果
@@ -125,14 +139,45 @@ public class BasinCalculateTest {
                     };
                 }
                 if (!isGenMin) {
-                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "输出\\2023年日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + dispatchType + "\\2023年日尺度最大发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
                 } else {
-                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + DispatchType + "输出\\2023年日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
+                    ExcelUtils.writeExcel("D:\\Data\\5.大渡河\\整理数据\\大渡河流域内部发电能力预测\\发电计算\\全流域计算\\" + basin + "\\" + dispatchType + "\\2023年日尺度最小发电能力计算结果" + "-预见期" + schedulingL + "天.xlsx", station, res);
                 }
             }
             genMin++;
         }
 
+    }
+
+    private static double getHAfterFromExcel(Object[][] data, Date date, String period) {
+        if (data.length == 0) {
+            // 完全找不到有水位的记录，这里你要自己定策略：用默认值 / 抛异常 / 记录 remark
+            return 0;
+        }
+        // 先建 filterData
+        Object[][] filterData = Arrays.stream(data)
+                .skip(1)
+                .filter(d -> TimeUtils.isAfterOrSame((Date) d[0], date, period))
+                .toArray(Object[][]::new);
+        // 先在窗口内找
+        Optional<Object[]> optRow = Arrays.stream(filterData)
+                .filter(r -> !(r[1] == null && r[2] == null && r[3] == null))
+                .findFirst();
+        Object[] rowForLevel;
+        // 窗口内没有，就在全体数据里找最近的
+        rowForLevel = optRow.orElseGet(() -> Arrays.stream(data)
+                .skip(1)
+                .filter(r -> !(r[1] == null && r[2] == null && r[3] == null))
+                .min(Comparator.comparingLong(r ->
+                        Math.abs(((Date) r[0]).getTime() - date.getTime())
+                ))
+                .orElse(null));
+        if (rowForLevel != null) {
+            return Tools.changeObjToDouble(rowForLevel[3]);
+        } else {
+            // 完全找不到有水位的记录，这里你要自己定策略：用默认值 / 抛异常 / 记录 remark
+            return 0;
+        }
     }
 
     private static void getCalInputFromExcel(Object[][] data, CalculateInput input) {

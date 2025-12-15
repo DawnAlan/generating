@@ -1,7 +1,9 @@
 package com.hust.generatingcapacity.model.generation.domain;
 
 import com.googlecode.aviator.AviatorEvaluator;
+import com.hust.generatingcapacity.dto.ConstraintInfDTO;
 import com.hust.generatingcapacity.model.generation.type.ConditionType;
+import com.hust.generatingcapacity.model.generation.type.ConstraintType;
 import com.hust.generatingcapacity.model.generation.type.ParamBoundType;
 import com.hust.generatingcapacity.model.generation.type.ParamType;
 import com.hust.generatingcapacity.model.generation.util.DisplayUtils;
@@ -21,7 +23,7 @@ import java.util.stream.Collectors;
 @Setter
 public class ConstraintData {
     //约束类型
-    private String constraintType;
+    private ConstraintType constraintType;
     //是否为硬约束
     private Boolean rigid;
     //约束描述
@@ -30,6 +32,17 @@ public class ConstraintData {
     private String condition;
     //约束参数
     private List<String> param;
+
+    public ConstraintData() {
+    }
+
+    public ConstraintData(ConstraintInfDTO constraintInfDTO) {
+        this.constraintType = ConstraintType.fromCode(constraintInfDTO.getConstraintType());
+        this.rigid = constraintInfDTO.getRigid();
+        this.description = constraintInfDTO.getDescription();
+        this.condition = constraintInfDTO.getCondition();
+        this.param = constraintInfDTO.getParam();
+    }
 
     /**
      * 判断条件是否生效
